@@ -44,7 +44,7 @@ informative:
 This document proposes such a mechanism.
 
 TO BE REMOVED: This document is being collaborated on in Github at:
-[https://github.com/johanix/draft-berra-dnsop-opt-transaction-state](https://github.com/johanix/draft-berra-dnsop-transaction-state-00).
+[https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer](https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer).
 The most recent working version of the document, open issues, etc, should all be
 available there.  The authors (gratefully) accept pull requests.
 
