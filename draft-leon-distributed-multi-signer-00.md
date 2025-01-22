@@ -519,11 +519,34 @@ become an attack vector for an adversary.
 
 # Security Considerations
 
-...
+Multi-signer is a complex system with a number of components and a
+significant amount of automation. The authors believe that the only
+way to make a multi-signer architecture useful in practice is via
+automation. However, automation is a double-edged sword. It can both
+make the system more robust and more vulnerable.
+
+From a vulnerability point-of-view this architecture introduces several
+new components into the zone signing and publication process. In
+particular the COMBINER and the MSAs are new components that need
+to be secure. The COMBINER has the advantage of not having to announce
+its location to the outside world, as it only needs to communicate with
+internal components (the zone owner, the signer and the MSA).
+
+The MSAs are more vulnerable. They need to be discoverable by other MSAs
+and hence they are also discoverable by an adversary. On the other hand,
+the MSAs are not needed for a new zone to signed and published, they are
+only needed when there are changes that require the MSAs to synchronize,
+which is an infrequent event. Furthermore, should an MSA be unable to
+fulfill its role during the execution of a multi-signer process, the
+multi-signer process will simply stop where it is. Regardless of where
+the stop (or rather pause) occurs, the zone will be fully functional
+and once the MSA is able to resume its role, the multi-signer process
+will continue from where it left off.
 
 # IANA Considerations.
 
-...
+None at this stage. Later on the MSIGNER record will need to be
+registered as a new DNS resource record.
 
 --- back
 
