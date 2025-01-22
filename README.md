@@ -1,9 +1,9 @@
-# draft-leon-distributed-multi-signer
+# draft-leon-dnsop-distributed-multi-signer
 
 ## Contributing
 
 See the
-[guidelines for contributions](https://github.com/johanix/draft-leon-distributed-multi-signer/blob/main/CONTRIBUTING.md).
+[guidelines for contributions](https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer/blob/main/CONTRIBUTING.md).
 
 Contributions can be made by creating pull requests.
 The GitHub interface supports creating pull requests using the Edit (✏) button.
