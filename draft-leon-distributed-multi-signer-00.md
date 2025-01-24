@@ -1,3 +1,4 @@
+- [Abstract](#abstract)
 - [Introduction](#introduction)
   - [Requirements Notation](#requirements-notation)
 - [Terminology](#terminology)
@@ -9,14 +10,20 @@
   - [Multi-Signer Agent: Signer vs Sidecar](#multi-signer-agent-signer-vs-sidecar)
   - [Source of Truth](#source-of-truth)
     - [The COMBINER](#the-combiner)
-- [Communication Between MSAs](#communication-between-msas)
-  - [MSA Communication via REST API](#msa-communication-via-rest-api)
-  - [MSA Communication via DNS](#msa-communication-via-dns)
 - [Identifying the Designated Signers](#identifying-the-designated-signers)
   - [The MSIGNER RRset](#the-msigner-rrset)
-- [Locating Remote Multi-Signer Agents](#locating-remote-multi-signer-agents)
-  - [Locating a Remote DNS-Method Multi-Signer Agent](#locating-a-remote-dns-method-multi-signer-agent)
-  - [Locating a Remote API-Method Multi-Signer Agent](#locating-a-remote-api-method-multi-signer-agent)
+    - [Use of the MSIGNER State Field](#use-of-the-msigner-state-field)
+- [Communication Between MSAs](#communication-between-msas)
+  - [MSA Communication via DNS](#msa-communication-via-dns)
+  - [MSA Communication via REST API](#msa-communication-via-rest-api)
+  - [Locating Remote Multi-Signer Agents](#locating-remote-multi-signer-agents)
+    - [Locating a Remote DNS-Method Multi-Signer Agent](#locating-a-remote-dns-method-multi-signer-agent)
+    - [Locating a Remote API-Method Multi-Signer Agent](#locating-a-remote-api-method-multi-signer-agent)
+      - [Fallback to DNS-based Communication](#fallback-to-dns-based-communication)
+  - [The Initial HELLO Phase](#the-initial-hello-phase)
+    - [DNS-based HELLO Phase](#dns-based-hello-phase)
+    - [API-based HELLO Phase](#api-based-hello-phase)
+    - [Interpretation of the HELLO Responses](#interpretation-of-the-hello-responses)
   - [Multi-Signer EDNS(0) Option Format](#multi-signer-edns0-option-format)
     - [Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option](#encoding-transport-capabilities-in-the-multi-signer-edns0-option)
     - [Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option](#encoding-synchronization-capabilities-in-the-multi-signer-edns0-option)
@@ -29,7 +36,7 @@
 - [Security Considerations](#security-considerations)
 - [IANA Considerations.](#iana-considerations)
   - [New Multi-Signer EDNS Option](#new-multi-signer-edns-option)
-  - [A New Registry for EDNS Option Multi-Signer Operation Codes](#a-new-registry-for-edns-option-multi-signer-operation-codes--multi-signer-opt-operation-code-registry)
+  - [A New Registry for EDNS Option Multi-Signer Operation Codes](#a-new-registry-for-edns-option-multi-signer-operation-codes)
 - [Change History (to be removed before publication)](#change-history-to-be-removed-before-publication)
 ---
 title: "Distributed DNSSEC Multi-Signer"
@@ -262,7 +269,7 @@ is to use a separate, bump-on-the-wire signer. This is a signer that
 receives the unsigned zone via an incoming zone transfer, signs the
 zone, and publishes the signed zone via an outbound zone transfer. In
 such a design the source of truth has been split up between the “zone
-owner” (source of truth for all unsigned zone data), and the signer
+owner” (source of truth for all non-DNSSEC zone data), and the signer
 (source of truth for all DNSSEC data in the zone).
 
 In a distributed multi-signer architecture the source of truth is
@@ -335,38 +342,6 @@ between the zone owner, the COMBINER, the signer and the MSA:
              +-----+                                              +---+
 ~~~
 
-
-# Communication Between MSAs
-
-Also in the communication case there are two identified
-alternatives. The first is to use a REST API between the MSAs and the
-second is to use pure DNS communication.
-
-## MSA Communication via REST API
-
-REST APIs are well-known and a natural fit for many distributed
-systems. The challenge is mostly in the initial setup of secure
-communication. The certificates need to be validated, preferably
-without a requirement on trusting a third party CA. The API endpoints
-for each MSA need to be located. Once secure communication has been
-established, using a REST API for MSA communication is
-straight-forward.
-
-## MSA Communication via DNS
-
-This alternative is based on the observation that all the
-communication needs between MSAs can be expressed via DNS
-messages. Notifications are sent as DNS NOTIFY messages. In
-Leader/Follower mode requests for changes to a zone are sent as a DNS
-UPDATE from the Leader to the Follower. The sole remaining
-communication requirement is for how to communicate information about
-the current state between MSAs in an ongoing multi-signer
-process. This is done via a dedicated EDNS(0) opcode specifically for
-communicating multi-signer state. This model is based on
-{{!draft-berra…}} that solves a similar problem for delegation
-synchronization between child and parent.
-
-
 # Identifying the Designated Signers 
 
 It is the responsibility of the zone owner to choose a set of
@@ -379,12 +354,14 @@ The MSIGNER RRset must be added, by the zone owner, to the, typically
 unsigned, zone that the zone owner maintains so that this RRset is
 visible to the downstream signers and their multi-signer agents.
 
+
 ## The MSIGNER RRset
 
 The MSIGNER RR has the zone name that publishes the MSIGNER RRset as
-the owner name and the two fields State  and Identity as RDATA.
+the owner name (i.e. the MSIGNER RRset must be located at the apex of
+the zone). The RDATA consists of two fields "State" and "Identity":
 
-zone.    MSIGNER State Identity
+zone.example.    MSIGNER State Identity
 
 State:
     Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
@@ -399,12 +376,79 @@ Example:
 
 zone.example.   MSIGNER ON msa.example.
 
+### Use of the MSIGNER State Field
 
-# Locating Remote Multi-Signer Agents
+The MSIGNER State field is used to signal to all MSAs what the status of
+each MSA is from the point-of-view of the zone owner. The two possible
+values are "ON" and "OFF" where "ON" means that the MSA is a currently
+designated signer for the zone and "OFF" means that the MSA is previously
+designated signer for the zone that is in the process of being offboarded.
+
+The reason for the "OFF" state is that the offboarding process involves
+the remaining signers (hence the signalling) and it is important to know
+which signer is being offboarded so that the correct data may be removed
+in the correct order during the multi-signer "remove signer" process
+(see {{!RFC8901}}).
+
+Once the offboarding process is complete the MSIGNER RR for the offboarded 
+MSA may be removed from the zone at the zone owners discretion.
+
+# Communication Between MSAs
+
+For the communication between MSAs there are two choices that need to be
+made among the designated MSAs for a zone. The first is what "transport"
+to use for the communication. The second is what "synchronization" model
+to use when executing future multi-signer processes.
+
+The two defined transport alternatives are:
+
+* DNS-based communication (mandatory to support)
+* REST API-based communication
+
+Each has pros and cons and at this point in time it is not clear that one
+always is better than the other. To simplify the choice of transport DNS-based
+communication is mandatory to support and the REST API-based communication
+may only be used if all MSAs support it. Supported transports are signaled
+in the Multi-Signer EDNS(0) Option (see section NNN below).
+
+The two defined synchronization alternatives are:
+
+* Leader/Follower synchronization (mandatory to support)
+* Peer-to-Peer synchronization
+
+Just as for transport, supported synchronization models are signaled in the
+Multi-Signer EDNS(0) Option (see section NNN below).
+
+ ## MSA Communication via DNS
+
+This transport alternative is based on the observation that all the
+communication needs between MSAs can be expressed via DNS
+messages. Notifications are sent as DNS NOTIFY messages. Requests
+for changes to a zone are sent as DNS UPDATE messages, etc. The
+sole remaining communication requirement is for how to communicate
+information about the current state between MSAs in an ongoing
+multi-signer process. For this reason a dedicated EDNS(0) opcode
+specifically for multi-signer synchronization is proposed.
+
+This model is based on {{!draft-berra…}} that solves a similar
+problem for delegation synchronization between child and parent,
+which has already been implemented and shown to work.
+
+## MSA Communication via REST API
+
+REST APIs are well-known and a natural fit for many distributed
+systems. The challenge is mostly in the initial setup of secure
+communication. The certificates need to be validated, preferably
+without a requirement on trusting a third party CA. The API endpoints
+for each MSA need to be located. Once secure communication has been
+established, using a REST API for MSA communication is
+straight-forward.
+
+## Locating Remote Multi-Signer Agents
 
 When an MSA receives a zone via zone transfer from the signer it will
 analyze the zone to see whether it contains an MSIGNER RRset. If there
-is no MSIGNER RRset the zone must be ignored by the MSA from the
+is no MSIGNER RRset the zone MUST be ignored by the MSA from the
 point-of-view of multi-signer synchronization.
 
 If, however, the zone does contain an MSIGNER RRset then the MSA must
@@ -421,7 +465,7 @@ baseline that MSAs MUST support to be compliant.
 In the following two subsections we detail how an MSA can locate a remote MSA
 and establish secure DNS-based and API-based communications, respectively.
 
-## Locating a Remote DNS-Method Multi-Signer Agent
+### Locating a Remote DNS-Method Multi-Signer Agent
 
 Locating a remote MSA using the DNS mechanism consists of the
 following steps:
@@ -462,20 +506,18 @@ the remote MSA and verify the identity of the responding party via the
 validated KEY record for the remote MSAs SIG(0) public key.
 
 
-## Locating a Remote API-Method Multi-Signer Agent
+### Locating a Remote API-Method Multi-Signer Agent
 
-Locating a remote MSA with the identity “msa.example.” using the API
-mechanism consists of the following steps:
+Locating a remote MSA using the API mechanism consists of the following steps:
 
-* Lookup and DNSSEC-validate the URI record for
-  “_https._tcp.msa.example.”. This provides the base URL that will be
+* Lookup and DNSSEC-validate the URI record for for the HTTPS protocol for
+  the MSIGNER identity. This provides the base URL that will be
   used to construct the individual API endpoints for the REST API. It
   also provides the port to use.
-* Lookup and DNSSEC-validate the SVCB record for the URI record target
-  (eg. “api.msa.example.”). This provides the IP-addresses to use for
-  communication with the MSA.
-* Lookup and DNSSEC-validate the TLSA record for
-  “_{port}._tcp.api.msa.example. This will enable verification of the
+* Lookup and DNSSEC-validate the SVCB record for the URI record target.
+  This provides the IP-addresses to use for communication with the MSA.
+* Lookup and DNSSEC-validate the TLSA record for the port and protocol
+  specified in the URI record. This will enable verification of the
   certificate of the remote MSA once communication starts.
 
 Example: given the following MSIGNER record for a remote MSA:
@@ -494,8 +536,8 @@ api.msa.provider.com.   IN  SVCB 1 ipv4hint=1.2.3.4 ipv6hint=2001::bad:cafe:443
 api.msa.provider.com.   IN  RRSIG SVCB …
 
 Now we know the IP-address and the port as well as the base URL to
-use. Now look up the TLSA record for _443._tcp.api.msa.provider.com,
-which may look like this:
+use. Finally the TLSA record for _443._tcp.api.msa.provider.com is looked up,
+with a response that may look like this:
 
   _443._tcp.api.msa.provider.com.  IN  TLSA 3 1 1 ….
   _443._tcp.api.msa.provider.com.  IN  RRSIG TLSA …
@@ -504,6 +546,71 @@ Once all the DNS lookups and DNSSEC-validation of the returned data
 has been done, the local MSA is able to initiate communication with
 the remote MSA and verify the identity of the responding party via the
 TLSA record for the remote MSAs certificate.
+
+#### Fallback to DNS-based Communication
+
+If the API-based communication fails, either because needed DNS records
+are missing, the TLSA record fails to validate the remote MSAs certificate
+or the remote MSA simply doesn't respond, the local MSA MUST fall back to
+DNS-based communication.
+
+## The Initial HELLO Phase
+
+When two MSAs need to communicate with each other for the first time (because
+they are both deisgnated signers for the same zone), they need to establish
+secure communication. This is done in a "HELLO" phase where the MSAs
+exchange information about their capabilities.
+
+### DNS-based HELLO Phase
+
+When using DNS-based communication the HELLO phase is done by sending a
+NOTIFY(SOA) for the zone that triggered the need for communication. The
+NOTIFY message MUST contain a Multi-Signer EDNS(0) Option (see
+section NNN below). 
+
+In the Multi-Signer EDNS(0) Option the OPERATION field MUST have the value
+"HELLO" (1). Furthermore, the MSA signals its transport and synchronization
+capabilities in the TRANSPORT and SYNCHRONIZATION fields. This message is
+signed with the SIG(0) key for the local MSA for which the public key is
+published as a KEY record for the MSA.
+
+In the response to the NOTIFY, the remote MSA does the same and the two
+MSAs can now verify each other's identity and are also aware of the other
+MSAs transport and synchronization capabilities.
+
+### API-based HELLO Phase
+
+When using API-based communication the HELLO phase is done by sending a
+REST API POST request to the remote MSA at the "/hello" endpoint. The request
+MUST contain a JSON encoded object with the following fields:
+
+* "transport": The transport capabilities of the local MSA.
+* "synchronization": The synchronization capabilities of the local MSA.
+
+The response MUST contain a JSON object with the following fields:
+
+* "transport": The transport capabilities of the remote MSA.
+* "synchronization": The synchronization capabilities of the remote MSA.
+
+### Interpretation of the HELLO Responses
+
+Once an MSA has received HELLO responses from all other MSAs that are designated
+signers for the zone, it knows the capabilities of the MSAs as a group. It can
+then use this information to determine which transport to use:
+
+* If all MSAs support API-based communication, the MSAs will use API-based
+  communication.
+* If one or more MSAs only support DNS-based communication, the MSAs will use
+  DNS-based communication for this zone.
+
+Likewise, each MSA now knows the synchronization capabilities of the other
+MSAs and can determine which synchronization model to use:
+
+* If all MSAs support the Peer-to-Peer synchronization model, the MSAs
+  will use the Peer-to-Peer synchronization model for this zone.
+* If one or more MSAs only support the Leader/Follower synchronization
+  model, the MSAs will use the Leader/Follower synchronization model for
+  this zone.
 
 ## Multi-Signer EDNS(0) Option Format 
 
