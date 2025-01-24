@@ -23,19 +23,36 @@
       <t><xref target="msa-communication-via-rest-api">MSA Communication via REST API</xref></t>
       <t><xref target="msa-communication-via-dns">MSA Communication via DNS</xref></t>
     </list></t>
-  <t><xref target="identifying-the-designated-signers">Identifying the Designated Signers</xref></t>
+  <t><xref target="identifying-the-designated-signers">Identifying the Designated Signers</xref>
+  <list style="symbols">
+      <t><xref target="the-msigner-rrset">The MSIGNER RRset</xref></t>
+    </list></t>
   <t><xref target="locating-remote-multi-signer-agents">Locating Remote Multi-Signer Agents</xref>
   <list style="symbols">
-      <t><xref target="locating-a-remote-api-method-multi-signer-agent">Locating a Remote API-Method Multi-Signer Agent</xref></t>
       <t><xref target="locating-a-remote-dns-method-multi-signer-agent">Locating a Remote DNS-Method Multi-Signer Agent</xref></t>
+      <t><xref target="locating-a-remote-api-method-multi-signer-agent">Locating a Remote API-Method Multi-Signer Agent</xref></t>
+      <t><xref target="multi-signer-edns0-option-format">Multi-Signer EDNS(0) Option Format</xref>
+      <list style="symbols">
+          <t><xref target="encoding-transport-capabilities-in-the-multi-signer-edns0-option">Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option</xref></t>
+          <t><xref target="encoding-synchronization-capabilities-in-the-multi-signer-edns0-option">Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option</xref></t>
+        </list></t>
     </list></t>
+  <t><xref target="sequence-diagram-example-of-establishing-secure-comms---the-hello-phase">Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"</xref></t>
   <t><xref target="synchronization-of-changes-between-msas">Synchronization of Changes Between MSAs</xref>
   <list style="symbols">
       <t><xref target="leaderfollower-mode">Leader/Follower Mode</xref></t>
       <t><xref target="peer-mode">Peer Mode</xref></t>
     </list></t>
+  <t><xref target="rationale"></xref>
+  <list style="symbols">
+      <t><xref target="separation-of-msa-and-combiner">Separation of MSA and COMBINER</xref></t>
+    </list></t>
   <t><xref target="security-considerations">Security Considerations</xref></t>
-  <t><xref target="iana-considerations">IANA Considerations.</xref></t>
+  <t><xref target="iana-considerations">IANA Considerations.</xref>
+  <list style="symbols">
+      <t><xref target="new-multi-signer-edns-option">New Multi-Signer EDNS Option</xref></t>
+      <t><xref target="a-new-registry-for-edns-option-multi-signer-operation-codes--multi-signer-opt-operation-code-registry">A New Registry for EDNS Option Multi-Signer Operation Codes</xref></t>
+    </list></t>
   <t>    <section anchor="change-history-to-be-removed-before-publicationchange-history-to-be-removed-before-publication"><name><xref target="change-history-to-be-removed-before-publication">Change History (to be removed before publication)</xref></name>
   <vspace blankLines='1'/>
 title: "Distributed DNSSEC Multi-Signer"
@@ -79,16 +96,29 @@ pi: [toc, sortrefs, symrefs]</t>
 
 <t>--- abstract</t>
 
+</section>
+<section anchor="abstract"><name>Abstract</name>
+
 <t>This document presents an architecture for a distributed DNS
-multi-signer model. It describes two models for multi-signer process
-traversal: “leader/follower mode” and “peer mode”. It also discusses
-two alternatives for secure communication between the individual
-multi-signer agents: a RESTful API secured by TLS and “pure DNS”
-communication secured by DNS SIG(0) signatures on each message.</t>
+multi-signer model. It defines two multi-signer specific entities:
+the "multi-signer agent" (MSA) that is responsible for the multi-signer
+process and the "combiner", which manages combination of unsigned zone
+data from the zone owner with zone data under control of the MSA. It
+introduces a new DNS RRtype, MSIGNER, that is used by the zone
+owner to designate the chosen multi-signer agents. Furthermore it
+describes a mechanism for the MSAs to establish secure communication
+with each other, either via “pure DNS” communication secured by DNS
+SIG(0) signatures on each message or via a RESTful API secured by
+TLS. Finally, the document describes two models for multi-signer
+process synchronization: “leader/follower mode” and “peer mode” and
+the mechanism by which a set of MSAs decide which model to use for a
+given zone.</t>
 
 <t>The scope of the document is only the distributed aspect of DNS
-multi-signer. The so-called “multi-signer processes” are the same as
-described in <xref target="!RFC8901"/>.</t>
+multi-signer up to the point where secure communication and synchronization
+method between MSAs has been established. The “multi-signer processes” that
+deal with the actual synchronization required for multi-signer operation
+are the same as described in <xref target="!RFC8901"/>.</t>
 
 <t>TO BE REMOVED: This document is being collaborated on in Github at:
 <eref target="https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer">https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer</eref>.
@@ -269,7 +299,7 @@ requirements.</t>
 </section>
 <section anchor="source-of-truth"><name>Source of Truth</name>
 
-<t>A very common design for DNSSEC signing (regardless of multi-signer)
+<t>A common design for DNSSEC signing (regardless of multi-signer)
 is to use a separate, bump-on-the-wire signer. This is a signer that
 receives the unsigned zone via an incoming zone transfer, signs the
 zone, and publishes the signed zone via an outbound zone transfer. In
@@ -397,40 +427,29 @@ and consisting of one MSIGNER record for each signer.</t>
 
 <t>The MSIGNER RRset must be added, by the zone owner, to the, typically
 unsigned, zone that the zone owner maintains so that this RRset is
-visible to the downstream signers and their multi-signer agents.
-6.1. The MSIGNER RRset Yada, yada.</t>
+visible to the downstream signers and their multi-signer agents.</t>
+
+<section anchor="the-msigner-rrset"><name>The MSIGNER RRset</name>
 
 <t>The MSIGNER RR has the zone name that publishes the MSIGNER RRset as
-the owner name and the three fields State, Transport and Identity as
-RDATA.</t>
+the owner name and the two fields State  and Identity as RDATA.</t>
 
-<t>zone.    MSIGNER State Transport Identity</t>
+<t>zone.    MSIGNER State Identity</t>
 
-<dl>
-  <dt>State</dt>
-  <dd>
-    <t>Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0 is an error.
-Values 3-127 are presently undefined. Values 128-255 are reserved for private 
-use. The presentation format allows either as integers (1 or 2) or as tokens (“ON” 
-or “OFF”).</t>
-  </dd>
-  <dt>Transport</dt>
-  <dd>
-    <t>Unsigned 8-bit. Defined values are 1=DNS and 2=API. The value 0 is an error. <br />
-Values 3-127 are presently undefined. Values 128-255 are reserved for private 
-use. The presentation format allows either as integers (1 or 2) or as tokens 
-(“DNS” or “API”).</t>
-  </dd>
-  <dt>Identity</dt>
-  <dd>
-    <t>Domain name. Used to uniquely identify the Multi-Signer Agent.</t>
-  </dd>
-</dl>
+<t>State:
+    Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
+    is an error.  Values 3-127 are presently undefined. Values 128-255
+    are reserved for private use. The presentation format allows
+    either as integers (1 or 2) or as tokens (“ON” or “OFF”).</t>
+
+<t>Identity:
+    Domain name. Used to uniquely identify the Multi-Signer Agent.</t>
 
 <t>Example:</t>
 
-<t>zone.example.   MSIGNER ON API msa.example.</t>
+<t>zone.example.   MSIGNER ON msa.example.</t>
 
+</section>
 </section>
 <section anchor="locating-remote-multi-signer-agents"><name>Locating Remote Multi-Signer Agents</name>
 
@@ -443,75 +462,34 @@ point-of-view of multi-signer synchronization.</t>
 analyze this RRset to identify the other MSAs for the zone via their
 target names in each MSIGNER record. If any of the other MSAs listed
 in the MSIGNER RRset is previously unknown to this MSA then secure
-communication with this other MSA must be established. The
-communication mechanism to use is listed in the MSIGNER record as
-either “API” or “DNS”.</t>
+communication with this other MSA must be established.</t>
 
-<section anchor="locating-a-remote-api-method-multi-signer-agent"><name>Locating a Remote API-Method Multi-Signer Agent</name>
+<t>Secure communication can be achieved via various transports and it is up to the
+MSAs in the zone's MSIGNER records to determine amongst themselves. In this
+document we propose two transports: DNS and API. We also establish DNS as a
+baseline that MSAs MUST support to be compliant.</t>
 
-<t>Locating a remote MSA with the identity “msa.example.” using the API
-mechanism consists of the following steps:</t>
+<t>In the following two subsections we detail how an MSA can locate a remote MSA
+and establish secure DNS-based and API-based communications, respectively.</t>
 
-<t><list style="symbols">
-  <t>Lookup and DNSSEC-validate the URI record for
-“_https._tcp.msa.example.”. This provides the base URL that will be
-used to construct the individual API endpoints for the REST API. It
-also provides the port to use.</t>
-  <t>Lookup and DNSSEC-validate the SVCB record for the domain name
-returned in the response to the URI query
-(eg. “api.msa.example.”). This provides the IP-addresses (and
-possibly the port, but we already have that) to use for
-communication with the MSA.</t>
-  <t>Lookup and DNSSEC-validate the TLSA record for
-“_{port}._tcp.api.msa.example. This will enable verification of the
-certificate of the remote MSA once communication starts.</t>
-</list></t>
-
-<t>Example: given the following MSIGNER record for a remote MSA:</t>
-
-<t>zone.example.     IN MSIGNER ON  API msa.provider.com.</t>
-
-<t>the local MSA will look up the URI record for msa.provider.com:</t>
-
-<t>_https._tcp.msa.provider.com.  IN  URI  10 10 “https://api.msa.provider.com:443/api/v2/”
-_https._tcp.msa.provider.com.  IN  RRSIG URI …</t>
-
-<t>which triggers a lookup for api.msa.provider.com IPv4 and IPv6
-addresses as hints in an SVCB RR:</t>
-
-<t>api.msa.provider.com.   IN  SVCB 1 ipv4hint=1.2.3.4 ipv6hint=2001::bad:cafe:443
-api.msa.provider.com.   IN  RRSIG SVCB …</t>
-
-<t>Now we know the IP-address and the port as well as the base URL to
-use. Now look up the TLSA record for _443._tcp.api.msa.provider.com,
-which may look like this:</t>
-
-<t>_443._tcp.api.msa.provider.com.  IN  TLSA 3 1 1 ….
-  _443._tcp.api.msa.provider.com.  IN  RRSIG TLSA …</t>
-
-<t>Once all the DNS lookups and DNSSEC-validation of the returned data
-has been done, the local MSA is able to initiate communication with
-the remote MSA and verify the identity of the responding party via the
-TLSA record for the remote MSAs certificate.</t>
-
-</section>
 <section anchor="locating-a-remote-dns-method-multi-signer-agent"><name>Locating a Remote DNS-Method Multi-Signer Agent</name>
 
 <t>Locating a remote MSA using the DNS mechanism consists of the
 following steps:</t>
 
 <t><list style="symbols">
-  <t>Lookup and DNSSEC-validate the URI record of the MSIGNER
-identity. This provides the domain name and port to which DNS
-messages should be sent.</t>
-  <t>Lookup and DNSSEC-validate the KEY record of the URI record target
-name. This enables verification of the SIG(0) public key of the
-remote MSA once communication starts.</t>
+  <t>Lookup and DNSSEC-validate a URI record for the MSIGNER identity.
+This provides the domain name and port to which DNS messages should be sent.</t>
+  <t>Lookup and DNSSEC-validate the SVCB record of the URI record target to
+get the IP addresses to use for communication with the remote MSA.</t>
+  <t>Lookup and DNSSEC-validate the KEY record of the URI record target name.
+This enables verification of the SIG(0) public key of the remote MSA
+once communication starts.</t>
 </list></t>
 
 <t>Example: given the following MSIGNER record for a remote MSA:</t>
 
-<t>zone.example.     IN MSIGNER ON  DNS msa.provider.com.</t>
+<t>zone.example.     IN MSIGNER ON msa.provider.com.</t>
 
 <t>The local MSA will look up the URI record for msa.provider.com:</t>
 
@@ -537,6 +515,228 @@ the remote MSA and verify the identity of the responding party via the
 validated KEY record for the remote MSAs SIG(0) public key.</t>
 
 </section>
+<section anchor="locating-a-remote-api-method-multi-signer-agent"><name>Locating a Remote API-Method Multi-Signer Agent</name>
+
+<t>Locating a remote MSA with the identity “msa.example.” using the API
+mechanism consists of the following steps:</t>
+
+<t><list style="symbols">
+  <t>Lookup and DNSSEC-validate the URI record for
+“_https._tcp.msa.example.”. This provides the base URL that will be
+used to construct the individual API endpoints for the REST API. It
+also provides the port to use.</t>
+  <t>Lookup and DNSSEC-validate the SVCB record for the URI record target
+(eg. “api.msa.example.”). This provides the IP-addresses to use for
+communication with the MSA.</t>
+  <t>Lookup and DNSSEC-validate the TLSA record for
+“_{port}._tcp.api.msa.example. This will enable verification of the
+certificate of the remote MSA once communication starts.</t>
+</list></t>
+
+<t>Example: given the following MSIGNER record for a remote MSA:</t>
+
+<t>zone.example.     IN MSIGNER ON  msa.provider.com.</t>
+
+<t>the local MSA will look up the URI record for msa.provider.com:</t>
+
+<t>_https._tcp.msa.provider.com.  IN  URI  10 10 “https://api.msa.provider.com:443/api/v2/”
+_https._tcp.msa.provider.com.  IN  RRSIG URI …</t>
+
+<t>which triggers a lookup for api.msa.provider.com IPv4 and IPv6
+addresses as hints in an SVCB RR:</t>
+
+<t>api.msa.provider.com.   IN  SVCB 1 ipv4hint=1.2.3.4 ipv6hint=2001::bad:cafe:443
+api.msa.provider.com.   IN  RRSIG SVCB …</t>
+
+<t>Now we know the IP-address and the port as well as the base URL to
+use. Now look up the TLSA record for _443._tcp.api.msa.provider.com,
+which may look like this:</t>
+
+<t>_443._tcp.api.msa.provider.com.  IN  TLSA 3 1 1 ….
+  _443._tcp.api.msa.provider.com.  IN  RRSIG TLSA …</t>
+
+<t>Once all the DNS lookups and DNSSEC-validation of the returned data
+has been done, the local MSA is able to initiate communication with
+the remote MSA and verify the identity of the responding party via the
+TLSA record for the remote MSAs certificate.</t>
+
+</section>
+<section anchor="multi-signer-edns0-option-format"><name>Multi-Signer EDNS(0) Option Format</name>
+
+<t>This document uses an Extended Mechanism for DNS (EDNS0) <xref target="!RFC6891"/>
+option to include Key State information in DNS messages. The option is 
+structured as follows:</t>
+
+<figure><artwork><![CDATA[
+                                               1   1   1   1   1   1 
+       0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5 
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+ 0:  |                            OPTION-CODE                        |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+ 2:  |                           OPTION-LENGTH                       |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+ 4:  |           OPERATION           |           TRANSPORT           |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+ 8:  |        SYNCHRONIZATION        |                               /
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+ 
+ 10: / OPERATION-BODY                                                /
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+]]></artwork></figure>
+
+<t>Field definition details:</t>
+
+<t>OPTION-CODE:
+    2 octets / 16 bits (defined in <xref target="!RFC6891"/>) contains the value TBD
+    for KeyState.</t>
+
+<t>OPTION-LENGTH:
+    2 octets / 16 bits (defined in <xref target="!RFC6891"/>) contains the length of
+    the payload (everything after OPTION-LENGTH) in octets and should
+    be 3 plus the length of the EXTRA-TEXT field (which may be zero
+    octets long).</t>
+
+<t>OPERATION:
+    8 bits. Signals the type of operation the message performs. This document
+    defines the two operations HELLO and HEARTBEAT. For a complete distributed
+    multi-signer specification a number of additional operations will need to be
+    specified, either in a revision to this document or in a subsequent document.</t>
+
+<t>TRANSPORT:
+    8 bits. Encodes the transport capabilities of the MSA. With 8 bits it is possible to
+    define up to 8 different transports of which this document defines two: DNS and API.</t>
+
+<t>SYNCHRONIZATION:
+    8 bits. Encodes the synchronization capabilities of the MSA. With 8 bits it is
+    possible to define up to 8 different synchronization models of which this document
+    defines two: Leader/Follower and Peer-to-Peer.</t>
+
+<t>OPERATION-BODY:
+    Variable-length. Used to carry operation-specific parameters.</t>
+
+<section anchor="encoding-transport-capabilities-in-the-multi-signer-edns0-option"><name>Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option</name>
+
+<t>An MSA signals its transport capabilities by setting the corresponding bits to
+1.</t>
+
+<t>0: DNS transport supported (baseline, MUST be supported by all MSAs)</t>
+
+<t>1: API transport supported</t>
+
+<t>2: unused</t>
+
+<t>3: unused</t>
+
+<t>4: unused</t>
+
+<t>5: unused</t>
+
+<t>6: unused</t>
+
+<t>7: unused</t>
+
+</section>
+<section anchor="encoding-synchronization-capabilities-in-the-multi-signer-edns0-option"><name>Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option</name>
+
+<t>An MSA signals its synchronization capabilities by setting the corresponding
+bits to 1.</t>
+
+<t>0: Leader/Follower synchronization supported (baseline, MUST be supported by all MSAs)</t>
+
+<t>1: Peer-to-Peer synchronization supported</t>
+
+<t>2: unused</t>
+
+<t>3: unused</t>
+
+<t>4: unused</t>
+
+<t>5: unused</t>
+
+<t>6: unused</t>
+
+<t>7: unused</t>
+
+</section>
+</section>
+</section>
+<section anchor="sequence-diagram-example-of-establishing-secure-comms-the-hello-phase"><name>Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"</name>
+
+<t>The procedure of locating another MSA and establishing a secure
+communication, referred to as "The Hello Phase" is examplified in the
+sequence diagram below.</t>
+
+<t>The procedure is as follows:</t>
+
+<t><list style="numbers">
+  <t>The multisigner agents receive a zone via zone transfer. By
+analyzing the MSIGNER RRset each MSA become aware of the identities
+of the other MSAs for the zone. I.e. each MSA knows which other
+MSAs it needs to communicate with.  Communication with each of
+these, previously unknown, remote MSAs is referred to as "NEEDED".</t>
+  <t>Each MSA starts aquiring the information needed to establish secure
+communications with any previously unknown MSAs. Here we only
+illustrate the baseline case where DNS-based communications is to
+be used in the following phase. Once all needed information has
+been collected the communication with this remote MSA is considered
+to be "KNOWN".</t>
+  <t>Once an MSA has received the required information (URI, SVCB and
+KEY records in the baseline case) it sends a NOTIFY message with a
+dedicated Multi-Signer OPT code with OPERATION="HELLO". The sender
+uses this OPT field to signal its transport and synchronization
+capabilities. Similarly, the responder signals its capabilities
+using the same field.</t>
+  <t>When an MSA either gets a NOERROR response to its NOTIFY OPT(hello)
+message or responds with a NOERROR, it transitions out of "The
+Hello Phase" with the exchanging party and they transition to the
+next phaste where they start sending NOTIFY OPT(heartbeat) signals
+instead. The communication with the remote MSA is now considered to
+be in the "OPERATIONAL" state.</t>
+</list></t>
+
+<t>In the case where one MSA is aware of the need to communicate with
+another MSA, but the other is not (eg. the zone transfer was dealyed
+for one of them), the slower one SHOULD respond with a RCODE=REFUSED
+to any NOTIFY OPT(hello) it receives. Once it is ready, it will send
+its own NOTIFY OPT(hello) which should be responded to with a
+RCODE=NOERROR.</t>
+
+<figure><artwork><![CDATA[
++----------+                 +----------+                        +----------+
+|  Owner   |                 |  MSA A   |                        |  MSA B   |
++----------+                 +----------+                        +----------+
+     |                            |                                    |
+     |      AXFR(sign-me.se.)     |                                    |
+     |--------------------------->|                                    |
+     |      AXFR(sign-me.se.)     |                                    |
+     |---------------------------------------------------------------->|
+     |                            |                                    |
+     |                            |                                    |
+     |                            |  QUERY _dns._tcp.msa-b.se. URI?    |
+     |                            |----------------------------------->|
+     |                            |  QUERY ns.msa-b.se. SVCB?          |
+     |                            |----------------------------------->|
+     |                            |  QUERY ns.msa-b.se. KEY?           |
+     |                            |----------------------------------->|
+     |                            |                                    |
+     |                            |                                    |
+     |                            |  NOTIFY sign-me.se. OPT(hello)     |
+     |                            |----------------------------------->|
+     |                            |  NOERROR sign-me.se. OPT(hello)    |
+     |                            |<-----------------------------------|
+     |                            |                                    |
+     |                            |                                    |
+     |                            |  NOTIFY sign-me.se. OPT(heartbeat) |
+     |                            |----------------------------------->|
+     |                            |                                    |
+     |                            |                                    |
+     |                            |  NOTIFY sign-me.se. OPT(heartbeat) |
+     |                            |<-----------------------------------|
+     |                            |                                    |
+     |                            |                                    |
+     |                            |                                    |
+
+]]></artwork></figure>
+
 </section>
 <section anchor="synchronization-of-changes-between-msas"><name>Synchronization of Changes Between MSAs</name>
 
@@ -572,19 +772,93 @@ reduced to a notification mechanism (“I am now in state N”), although
 authenticated to avoid having the contents of this communication
 become an attack vector for an adversary.</t>
 
+<t>TO BE REMOVED BEFORE PUBLICATION:
+# Rationale</t>
+
+</section>
+<section anchor="separation-of-msa-and-combiner"><name>Separation of MSA and COMBINER</name>
+
+<t>It is possible to integrate all three multi-signer components (signer,
+msa and combiner) into a single piece of software (or two pieces,
+depending on the preferred way of slicing the functionality). However,
+such a composite module would be a fairly complex piece of software.
+This document aims to describe the functional separation of the different
+components rather than make a judgement on software design alternatives.
+Hence possible implementation choices are left to the implementer.</t>
+
 </section>
 </section>
 <section anchor="security-considerations"><name>Security Considerations</name>
 
-<t>...</t>
+<t>Multi-signer is a complex system with a number of components and a
+significant amount of automation. The authors believe that the only
+way to make a multi-signer architecture useful in practice is via
+automation. However, automation is a double-edged sword. It can both
+make the system more robust and more vulnerable.</t>
+
+<t>From a vulnerability point-of-view this architecture introduces
+several new components into the zone signing and publication
+process. In particular the COMBINER and the MSAs are new components
+that need to be secure. The COMBINER has the advantage of not having
+to announce its location to the outside world, as it only needs to
+communicate with internal components (the zone owner, the signer and
+the MSA).</t>
+
+<t>The MSAs are more vulnerable. They need to be discoverable by other
+MSAs and hence they are also discoverable by an adversary. On the
+other hand, the MSAs are not needed for a new zone to signed and
+published, they are only needed when there are changes that require
+the MSAs to synchronize, which is an infrequent event. Furthermore,
+should an MSA be unable to fulfill its role during the execution of a
+multi-signer process, the multi-signer process will simply stop where
+it is. Regardless of where the stop (or rather pause) occurs, the zone
+will be fully functional and once the MSA is able to resume its role,
+the multi-signer process will continue from where it left off.</t>
 
 </section>
 <section anchor="iana-considerations"><name>IANA Considerations.</name>
 
-<t>...</t>
+<section anchor="new-multi-signer-edns-option"><name>New Multi-Signer EDNS Option</name>
+
+<t>This document defines a new EDNS(0) option, entitled "Multi-Signer",
+assigned a value of TBD "DNS EDNS0 Option Codes (OPT)" registry</t>
+
+<t>TO BE REMOVED UPON PUBLICATION: 
+<eref target="foo">https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-11</eref></t>
+
+<t>+-------+--------------------+----------+----------------------+
+   | Value | Name               | Status   | Reference            |
+   +-------+--------------------+----------+----------------------+
+   | TBD   | Multi-Signer       | Standard | ( This document )    |
+   +-------+--------------------+----------+----------------------+</t>
+
+</section>
+<section anchor="a-new-registry-for-edns-option-multi-signer-operation-codes"><name>A New Registry for EDNS Option Multi-Signer Operation Codes</name>
+
+<t>The Multi-Signer option also defines an 8-bit operation field, for
+which IANA is requested to create and mainain a new registry entitled
+"Multi-Signer Operations", used by the Multi-Signer option. Initial
+values for the "Multi-Signer Operations" registry are given below;
+future assignments in in the 3-127 range are to be made through
+Specification Required review <xref target="?BCP26"/>.</t>
+
+<t>+-----------+---------------------------------------------+-------------------+
+| OPERATION | Mnemonic                                    | Reference         |
++-----------+---------------------------------------------+-------------------+
+| 0         | forbidden                                   | ( This document ) |
++-----------+---------------------------------------------+-------------------+
+| 1         | HELLO                                       | ( This document ) |
++-----------+---------------------------------------------+-------------------+
+| 2         | HEARTBEAT                                   | ( This document ) |
++-----------+---------------------------------------------+-------------------+
+| 3-127     | Unassigned                                  | ( This document ) |
++-----------+---------------------------------------------+-------------------+
+| 128-255   | Private Use                                 | ( This document ) |
++-----------+---------------------------------------------+-------------------+</t>
 
 <t>--- back</t>
 
+</section>
 </section>
 <section anchor="change-history-to-be-removed-before-publication"><name>Change History (to be removed before publication)</name>
 
