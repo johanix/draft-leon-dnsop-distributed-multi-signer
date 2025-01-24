@@ -73,8 +73,10 @@ informative:
 --- abstract
 
 This document presents an architecture for a distributed DNS
-multi-signer model. It defines an entity called the "multi-signer
-agent" (MSA) that is responsible for the multi-signer process. It
+multi-signer model. It defines two multi-signer specific entities:
+the "multi-signer agent" (MSA) that is responsible for the multi-signer
+process and the "combiner", which manages combination of unsigned zone
+data from the zone owner with zone data under control of the MSA. It
 introduces a new DNS RRtype, MSIGNER, that is used by the zone
 owner to designate the chosen multi-signer agents. Furthermore it
 describes a mechanism for the MSAs to establish secure communication
