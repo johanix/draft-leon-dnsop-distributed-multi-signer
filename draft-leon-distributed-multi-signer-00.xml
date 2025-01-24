@@ -51,7 +51,7 @@
   <t><xref target="iana-considerations">IANA Considerations.</xref>
   <list style="symbols">
       <t><xref target="new-multi-signer-edns-option">New Multi-Signer EDNS Option</xref></t>
-      <t><xref target="a-new-registry-for-edns-option-multi-signer-operation-codes--multi-signer-opt-operation-code-registry">A New Registry for EDNS Option Multi-Signer Operation Codes {: #multi-signer-opt-operation-code-registry}</xref></t>
+      <t><xref target="a-new-registry-for-edns-option-multi-signer-operation-codes--multi-signer-opt-operation-code-registry">A New Registry for EDNS Option Multi-Signer Operation Codes</xref></t>
     </list></t>
   <t>    <section anchor="change-history-to-be-removed-before-publicationchange-history-to-be-removed-before-publication"><name><xref target="change-history-to-be-removed-before-publication">Change History (to be removed before publication)</xref></name>
   <vspace blankLines='1'/>
@@ -96,9 +96,14 @@ pi: [toc, sortrefs, symrefs]</t>
 
 <t>--- abstract</t>
 
+</section>
+<section anchor="abstract"><name>Abstract</name>
+
 <t>This document presents an architecture for a distributed DNS
-multi-signer model. It defines an entity called the "multi-signer
-agent" (MSA) that is responsible for the multi-signer process. It
+multi-signer model. It defines two multi-signer specific entities:
+the "multi-signer agent" (MSA) that is responsible for the multi-signer
+process and the "combiner", which manages combination of unsigned zone
+data from the zone owner with zone data under control of the MSA. It
 introduces a new DNS RRtype, MSIGNER, that is used by the zone
 owner to designate the chosen multi-signer agents. Furthermore it
 describes a mechanism for the MSAs to establish secure communication
@@ -431,19 +436,14 @@ the owner name and the two fields State  and Identity as RDATA.</t>
 
 <t>zone.    MSIGNER State Identity</t>
 
-<dl>
-  <dt>State</dt>
-  <dd>
-    <t>Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0 is an error.
-Values 3-127 are presently undefined. Values 128-255 are reserved for private 
-use. The presentation format allows either as integers (1 or 2) or as tokens (“ON” 
-or “OFF”).</t>
-  </dd>
-  <dt>Identity</dt>
-  <dd>
-    <t>Domain name. Used to uniquely identify the Multi-Signer Agent.</t>
-  </dd>
-</dl>
+<t>State:
+    Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
+    is an error.  Values 3-127 are presently undefined. Values 128-255
+    are reserved for private use. The presentation format allows
+    either as integers (1 or 2) or as tokens (“ON” or “OFF”).</t>
+
+<t>Identity:
+    Domain name. Used to uniquely identify the Multi-Signer Agent.</t>
 
 <t>Example:</t>
 
@@ -622,17 +622,17 @@ structured as follows:</t>
 
 <t>1: API transport supported</t>
 
-<t>2: <unused /></t>
+<t>2: unused</t>
 
-<t>3: <unused /></t>
+<t>3: unused</t>
 
-<t>4: <unused /></t>
+<t>4: unused</t>
 
-<t>5: <unused /></t>
+<t>5: unused</t>
 
-<t>6: <unused /></t>
+<t>6: unused</t>
 
-<t>7: <unused /></t>
+<t>7: unused</t>
 
 </section>
 <section anchor="encoding-synchronization-capabilities-in-the-multi-signer-edns0-option"><name>Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option</name>
@@ -644,51 +644,61 @@ bits to 1.</t>
 
 <t>1: Peer-to-Peer synchronization supported</t>
 
-<t>2: <unused /></t>
+<t>2: unused</t>
 
-<t>3: <unused /></t>
+<t>3: unused</t>
 
-<t>4: <unused /></t>
+<t>4: unused</t>
 
-<t>5: <unused /></t>
+<t>5: unused</t>
 
-<t>6: <unused /></t>
+<t>6: unused</t>
 
-<t>7: <unused /></t>
+<t>7: unused</t>
 
 </section>
 </section>
 </section>
 <section anchor="sequence-diagram-example-of-establishing-secure-comms-the-hello-phase"><name>Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"</name>
 
-<t>The procedure of locating another MSA and establishing a secure communication,
-referred to as "The Hello Phase" is examplified in the sequence diagram below.</t>
+<t>The procedure of locating another MSA and establishing a secure
+communication, referred to as "The Hello Phase" is examplified in the
+sequence diagram below.</t>
 
 <t>The procedure is as follows:</t>
 
 <t><list style="numbers">
-  <t>The multisigner agents receive a zone via zone transfer. By analyzing the
-MSIGNER RRset each MSA become aware of the identities of the other MSAs for
-the zone. I.e. each MSA knows which other MSAs it needs to communicate with.
-Communication with each of these, previously unknown, remote MSAs is referred to as "NEEDED".</t>
-  <t>Each MSA starts aquiring the information needed to establish secure communications
-with any previously unknown MSAs. Here we only illustrate the baseline case where
-DNS-based communications is to be used in the following phase. Once all needed information has been collected the communication with this remote MSA is considered
+  <t>The multisigner agents receive a zone via zone transfer. By
+analyzing the MSIGNER RRset each MSA become aware of the identities
+of the other MSAs for the zone. I.e. each MSA knows which other
+MSAs it needs to communicate with.  Communication with each of
+these, previously unknown, remote MSAs is referred to as "NEEDED".</t>
+  <t>Each MSA starts aquiring the information needed to establish secure
+communications with any previously unknown MSAs. Here we only
+illustrate the baseline case where DNS-based communications is to
+be used in the following phase. Once all needed information has
+been collected the communication with this remote MSA is considered
 to be "KNOWN".</t>
-  <t>Once an MSA has received the required information (URI, SVCB and KEY records in the
-baseline case) it sends a NOTIFY message with a dedicated Multi-Signer OPT
-code with OPERATION="HELLO". The sender uses this OPT field to signal its
-transport and synchronization capabilities. Similarly, the responder signals
-its capabilities using the same field.</t>
-  <t>When an MSA either gets a NOERROR response to its NOTIFY OPT(hello) message
-or responds with a NOERROR, it transitions out of "The Hello Phase" with
-the exchanging party and they transition to the next phaste where they start
-sending NOTIFY OPT(heartbeat) signals instead. The communication with the remote
-MSA is now considered to be in the "OPERATIONAL" state.</t>
+  <t>Once an MSA has received the required information (URI, SVCB and
+KEY records in the baseline case) it sends a NOTIFY message with a
+dedicated Multi-Signer OPT code with OPERATION="HELLO". The sender
+uses this OPT field to signal its transport and synchronization
+capabilities. Similarly, the responder signals its capabilities
+using the same field.</t>
+  <t>When an MSA either gets a NOERROR response to its NOTIFY OPT(hello)
+message or responds with a NOERROR, it transitions out of "The
+Hello Phase" with the exchanging party and they transition to the
+next phaste where they start sending NOTIFY OPT(heartbeat) signals
+instead. The communication with the remote MSA is now considered to
+be in the "OPERATIONAL" state.</t>
 </list></t>
 
-<t>In the case where one MSA is aware of the need to communicate with another MSA, but the other is not (eg. the zone transfer was dealyed for one of them), the slower one SHOULD
-respond with a RCODE=REFUSED to any NOTIFY OPT(hello) it receives. Once it is ready, it will send its own NOTIFY OPT(hello) which should be responded to with a RCODE=NOERROR.</t>
+<t>In the case where one MSA is aware of the need to communicate with
+another MSA, but the other is not (eg. the zone transfer was dealyed
+for one of them), the slower one SHOULD respond with a RCODE=REFUSED
+to any NOTIFY OPT(hello) it receives. Once it is ready, it will send
+its own NOTIFY OPT(hello) which should be responded to with a
+RCODE=NOERROR.</t>
 
 <figure><artwork><![CDATA[
 +----------+                 +----------+                        +----------+
@@ -726,7 +736,9 @@ respond with a RCODE=REFUSED to any NOTIFY OPT(hello) it receives. Once it is re
      |                            |                                    |
 
 ]]></artwork></figure>
-<t># Synchronization of Changes Between MSAs</t>
+
+</section>
+<section anchor="synchronization-of-changes-between-msas"><name>Synchronization of Changes Between MSAs</name>
 
 <t>There are two defined models for synchronization. The first
 (Leader/Follower) has the advantage of more clearly mapping to the
@@ -784,23 +796,24 @@ way to make a multi-signer architecture useful in practice is via
 automation. However, automation is a double-edged sword. It can both
 make the system more robust and more vulnerable.</t>
 
-<t>From a vulnerability point-of-view this architecture introduces several
-new components into the zone signing and publication process. In
-particular the COMBINER and the MSAs are new components that need
-to be secure. The COMBINER has the advantage of not having to announce
-its location to the outside world, as it only needs to communicate with
-internal components (the zone owner, the signer and the MSA).</t>
+<t>From a vulnerability point-of-view this architecture introduces
+several new components into the zone signing and publication
+process. In particular the COMBINER and the MSAs are new components
+that need to be secure. The COMBINER has the advantage of not having
+to announce its location to the outside world, as it only needs to
+communicate with internal components (the zone owner, the signer and
+the MSA).</t>
 
-<t>The MSAs are more vulnerable. They need to be discoverable by other MSAs
-and hence they are also discoverable by an adversary. On the other hand,
-the MSAs are not needed for a new zone to signed and published, they are
-only needed when there are changes that require the MSAs to synchronize,
-which is an infrequent event. Furthermore, should an MSA be unable to
-fulfill its role during the execution of a multi-signer process, the
-multi-signer process will simply stop where it is. Regardless of where
-the stop (or rather pause) occurs, the zone will be fully functional
-and once the MSA is able to resume its role, the multi-signer process
-will continue from where it left off.</t>
+<t>The MSAs are more vulnerable. They need to be discoverable by other
+MSAs and hence they are also discoverable by an adversary. On the
+other hand, the MSAs are not needed for a new zone to signed and
+published, they are only needed when there are changes that require
+the MSAs to synchronize, which is an infrequent event. Furthermore,
+should an MSA be unable to fulfill its role during the execution of a
+multi-signer process, the multi-signer process will simply stop where
+it is. Regardless of where the stop (or rather pause) occurs, the zone
+will be fully functional and once the MSA is able to resume its role,
+the multi-signer process will continue from where it left off.</t>
 
 </section>
 <section anchor="iana-considerations"><name>IANA Considerations.</name>
@@ -820,18 +833,19 @@ assigned a value of TBD "DNS EDNS0 Option Codes (OPT)" registry</t>
    +-------+--------------------+----------+----------------------+</t>
 
 </section>
-<section anchor="a-new-registry-for-edns-option-multi-signer-operation-codes-multi-signer-opt-operation-code-registry"><name>A New Registry for EDNS Option Multi-Signer Operation Codes {: #multi-signer-opt-operation-code-registry}</name>
+<section anchor="a-new-registry-for-edns-option-multi-signer-operation-codes"><name>A New Registry for EDNS Option Multi-Signer Operation Codes</name>
 
-<t>The Multi-Signer option also defines an 8-bit operation field, for which IANA is
-requested to create and mainain a new registry entitled "Multi-Signer Operations",
-used by the Multi-Signer option. Initial values for the "Multi-Signer Operations"
-registry are given below; future assignments in  in the 3-127 range are to be
-made through Specification Required review <xref target="?BCP26"/>.</t>
+<t>The Multi-Signer option also defines an 8-bit operation field, for
+which IANA is requested to create and mainain a new registry entitled
+"Multi-Signer Operations", used by the Multi-Signer option. Initial
+values for the "Multi-Signer Operations" registry are given below;
+future assignments in in the 3-127 range are to be made through
+Specification Required review <xref target="?BCP26"/>.</t>
 
 <t>+-----------+---------------------------------------------+-------------------+
 | OPERATION | Mnemonic                                    | Reference         |
 +-----------+---------------------------------------------+-------------------+
-| 0         | <forbidden>                                 | ( This document ) |
+| 0         | forbidden                                   | ( This document ) |
 +-----------+---------------------------------------------+-------------------+
 | 1         | HELLO                                       | ( This document ) |
 +-----------+---------------------------------------------+-------------------+
@@ -840,7 +854,7 @@ made through Specification Required review <xref target="?BCP26"/>.</t>
 | 3-127     | Unassigned                                  | ( This document ) |
 +-----------+---------------------------------------------+-------------------+
 | 128-255   | Private Use                                 | ( This document ) |
-+-----------+---------------------------------------------+-------------------+</forbidden></t>
++-----------+---------------------------------------------+-------------------+</t>
 
 <t>--- back</t>
 
