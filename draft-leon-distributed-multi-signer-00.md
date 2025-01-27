@@ -1073,11 +1073,13 @@ assigned a value of TBD "DNS EDNS0 Option Codes (OPT)" registry
 TO BE REMOVED UPON PUBLICATION: 
 [https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-11](foo)
 
+~~~
    +-------+--------------------+----------+----------------------+
    | Value | Name               | Status   | Reference            |
    +-------+--------------------+----------+----------------------+
    | TBD   | Multi-Signer       | Standard | ( This document )    |
    +-------+--------------------+----------+----------------------+
+~~~
 
 ## A New Registry for EDNS Option Multi-Signer Operation Codes
 
@@ -1088,6 +1090,7 @@ values for the "Multi-Signer Operations" registry are given below;
 future assignments in in the 3-127 range are to be made through
 Specification Required review {{?BCP26}}.
 
+~~~
 +-----------+---------------------------------------------+-------------------+
 | OPERATION | Mnemonic                                    | Reference         |
 +-----------+---------------------------------------------+-------------------+
@@ -1101,7 +1104,7 @@ Specification Required review {{?BCP26}}.
 +-----------+---------------------------------------------+-------------------+
 | 128-255   | Private Use                                 | ( This document ) |
 +-----------+---------------------------------------------+-------------------+
-
+~~~
 
 --- back
 
