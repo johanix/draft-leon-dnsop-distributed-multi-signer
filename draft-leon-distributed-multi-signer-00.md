@@ -312,8 +312,24 @@ further split up into three participants:
  * The signer is the source of truth for all data generated via DNSSEC
    signing: own DNSKEYs, NSEC/NSEC3 RRs, RRSIGs, etc.
  * The MSA is the source of truth for the RRsets that must be kept in
-   sync across all the signers for the zone. This includes the zone NS
-   RRset, DNSKEYs from other signers, CDS and CSYNC RRsets.
+   sync across all the signers for the zone. This includes the DNSKEYs
+   from other signers, CDS and CSYNC RRsets. Possibly also the NS RRset.
+
+The NS RRset is an interesting special case. Traditionally the NS
+RRset is maintained by the zone owner, but based on data from the DNS
+providers (as authoritative nameservers is a primary service for the
+DNS provider). However, in a distributed multi-signer architecture the
+NS RRset should preferably be maintained by the MSA. For this reason
+the proposed design makes control of the NS RRset explicit and the
+responsibility of the zone owner to choose whether to retain control
+or delegate to the MSAs. Hence:
+
+ * The MSA is the source of truth for the NS RRset, subject to the
+   policy of the zone owner, as described in the SIGNER RRset (described
+   in #the-signer-rrset).
+
+Making the control of the NS RRset explicit is useful regardless of
+whether a zone uses multiple signers or single signer.
 
 To be able to keep the signer as simple as possible the changes to the
 NS, DNSKEY, CDS and CSYNC RRsets must be introduced into the unsigned
