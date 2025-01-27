@@ -169,7 +169,9 @@ when, and only when, they appear in all capitals, as shown here.
 
 # Terminology 
 
-...
+Signer Group
+: A group of MSAs sharing signing responsibility for one or more zones.
+
 
 # Requirements
 
@@ -624,7 +626,16 @@ are missing, the TLSA record fails to validate the remote MSAs certificate
 or the remote MSA simply doesn't respond, the local MSA MUST fall back to
 DNS-based communication.
 
-## The Initial HELLO Phase
+# Becoming Operational in Two Phases
+Before a signer group becomes operational and can perform any signing tasks,
+each MSA in the group must first establish some means of secure communication
+with all the other group members. This is done during what we call the
+"HELLO phase". Once established, the MSA signer transitions to the
+"AWAITING OTHERS phase" where it waits for all the other MSAs to establish
+secure communications with eachother. Once every MSA has a means of securely
+communicating every other MSA, the signer group becomes operational.
+
+## The HELLO Phase
 
 When two MSAs need to communicate with each other for the first time (because
 they are both deisgnated signers for the same zone), they need to establish
@@ -682,7 +693,31 @@ MSAs and can determine which synchronization model to use:
   model, the MSAs will use the Leader/Follower synchronization model for
   this zone.
 
-## Multi-Signer EDNS(0) Option Format 
+## The AWAITING OTHERS phase
+When an MSA has successfully HELLO:ed another MSA, it proceeds to transmit a
+HEARTBEAT message using the newly established secure transport. Eventually,
+when an MSA has seccesfully HELLO:ed all group members, the MSA will be
+transmitting HEARTBEAT:s to all of them. However, this does not mean that the
+group as a whole is ready perform any tasks. Before that can happen every group
+member must successfully HELLO every other group member.
+
+An MSA that has finished is own HELLO:s and is transmitting HEARTBEAT:s to the
+others while waiting for them to finish their HELLO:s is said to be in the
+"AWAITING OTHERS phase". But how do the MSAs in a signer group transition out
+of this phase and become operational? This is achieved by including a
+"nRemainingHELLO"-field in the HEARTBEAT body. Thus, the MSAs in the group
+become aware of whether their peers have successfully HELLO:ed the one another.
+Finally, when every HEARTBEAT that an MSA receives, and sends, has
+"nRemainingHELLO=0", it knows that the signer group is now operational and able
+to solve tasks.
+
+### DNS-based HEARTBEAT messages
+Who is qname? How is "Completed HELLO:s" encoded? What rcode is used?
+
+### API-based HEARTBEAT messages
+Endpoint? HTTP method? Body encoding?
+
+# Multi-Signer EDNS(0) Option Format 
 
 This document uses an Extended Mechanism for DNS (EDNS0) {{!RFC6891}}
 option to include Key State information in DNS messages. The option is 
@@ -734,7 +769,20 @@ SYNCHRONIZATION:
 OPERATION-BODY:
     Variable-length. Used to carry operation-specific parameters.
 
-### Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option
+### HEARTBEAT OPERATION-BODY
+
+~~~
+       0   1   2   3   4   5   6   7   8  
+     +---+---+---+---+---+---+---+---+---+
+ 0:  |            nRemainingHELLO        |
+     +---+---+---+---+---+---+---+---+---+
+~~~
+
+nRemainingHELLO:
+    8 bits. Used to encode how many HELLO:s an MSA has yet to complete.
+
+
+## Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option
 
 An MSA signals its transport capabilities by setting the corresponding bits to
 1.
@@ -755,7 +803,7 @@ An MSA signals its transport capabilities by setting the corresponding bits to
 
 7: unused
 
-### Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option
+## Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option
 
 An MSA signals its synchronization capabilities by setting the corresponding
 bits to 1.
@@ -776,7 +824,7 @@ bits to 1.
 
 7: unused
 
-# Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"
+# Sequence Diagram Example of the "HELLO phase"
 
 The procedure of locating another MSA and establishing a secure
 communication, referred to as "The Hello Phase" is examplified in the
