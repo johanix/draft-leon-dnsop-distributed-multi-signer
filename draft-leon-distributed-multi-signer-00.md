@@ -13,7 +13,7 @@
     - [The COMBINER](#the-combiner)
 - [Identifying the Designated Signers](#identifying-the-designated-signers)
 - [The SIGNER RRset](#the-signer-rrset)
-  - [Use of the SIGNER State Field](#use-of-the-signer-state-field)
+  - [Semantics of the SIGNER State Field](#semantics-of-the-signer-state-field)
   - [Semantics of the SIGNER NSMgmt Field](#semantics-of-the-signer-nsmgmt-field)
 - [Communication Between MSAs](#communication-between-msas)
   - [MSA Communication via DNS](#msa-communication-via-dns)
@@ -33,6 +33,7 @@
 - [Synchronization of Changes Between MSAs](#synchronization-of-changes-between-msas)
   - [Leader/Follower Mode](#leaderfollower-mode)
   - [Peer Mode](#peer-mode)
+- [Responsibilities of an MSA](#responsibilities-of-an-msa)
 - [Migration from Single-Signer to Multi-Signer](#migration-from-single-signer-to-multi-signer)
   - [Adding a single SIGNER record to an already signed zone](#adding-a-single-signer-record-to-an-already-signed-zone)
   - [Changing the SIGNER NSMGMT Field from OWNER To MSA](#changing-the-signer-nsmgmt-field-from-owner-to-msa)
@@ -93,7 +94,7 @@ informative:
 
 # Abstract
 
-This document presents an architecture for a distributed DNS
+This document presents an architecture for a distributed DNSSEC
 multi-signer model. It defines two multi-signer specific entities:
 the "multi-signer agent" (MSA) that is responsible for the multi-signer
 process and the "combiner", which manages combination of unsigned zone
@@ -108,7 +109,7 @@ process synchronization: “leader/follower mode” and “peer mode” and
 the mechanism by which a set of MSAs decide which model to use for a
 given zone.
 
-The scope of the document is only the distributed aspect of DNS
+The scope of the document is only the distributed aspect of DNSSEC
 multi-signer up to the point where secure communication and synchronization
 method between MSAs has been established. The “multi-signer processes” that
 deal with the actual synchronization required for multi-signer operation
@@ -136,6 +137,20 @@ agents) communicate and exchange data that should be signed by the
 other signer. The most obvious example is that each signer's
 Key-Signing Key must sign a DNSKEY RRset that contains the
 Zone-Signing Keys for all signers.
+
+To synchronize data between signers two models are possible: in a
+"centralized" model there is a single "controller" that decides what
+changes are needed. In a "distributed" model the signers themselves
+(or an agent of each signer)decide what changes are needed. 
+
+The first model has been implemented previously, and while it works from a technical
+point of view, it is not a good solution from a risk management point of
+view. The primary problem is that the signers have difficulty
+accepting that an external third party (the controller) has the ability
+to change the data (of a customer zone).
+
+This document is an attempt to address the synchronization problem by
+proposing a distributed model without a central controller.
 
 The communication between signers has two parts: first it is necessary
 to find out what data each signer has for a zone. Once all data has
@@ -409,7 +424,8 @@ visible to the downstream signers and their multi-signer agents.
 
 The SIGNER RR has the zone name that publishes the SIGNER RRset as
 the owner name (i.e. the SIGNER RRset must be located at the apex of
-the zone). The RDATA consists of two fields "State" and "Identity":
+the zone). The RDATA consists of three fields "State","NSMgmt" and
+"Identity":
 
 zone.example.    SIGNER State NSMgmt Identity
 
@@ -432,7 +448,7 @@ Example:
 
 zone.example.   SIGNER ON AGENT msa.example.
 
-## Use of the SIGNER State Field
+## Semantics of the SIGNER State Field
 
 The SIGNER State field is used to signal to all MSAs what the status of
 each MSA is from the point-of-view of the zone owner. The two possible
@@ -887,6 +903,25 @@ multi-signer process on its own. The communication is essentially
 reduced to a notification mechanism (“I am now in state N”), although
 authenticated to avoid having the contents of this communication
 become an attack vector for an adversary.
+
+# Responsibilities of an MSA
+
+For a group of MSAs to be able to communicate securely and synchronize
+data for a zone, each MSA must:
+
+* Publish the DNS records needed for secure communication with other MSAs:
+  * URI, SVCB and KEY records required for DNS-based communication secured by SIG(0).
+  * URI, SVCB and TLSA records required for API-based communication secured by TLS (if supported).
+  * All of the above MUST be published in a DNSSEC-signed zone under the domain name that is the identity of the MSA.
+  
+* For each zone that is managed, publish the data needed for synchronization with other MSAs:
+  * The DNSKEY RRset for the zone consisting of the DNSKEYS that the local signer uses to sign the zone.
+  * The CDS RRset for the zone, representing the KSK that the local signer uses to sign the zone (when needed).
+  * The NS RRset for the zone, consisting of the NS records of the authoritative nameserver that the local signer distributes the signed zone to.
+  * All of the above MUST be published in a DNSSEC-signed zone under the domain name that is the concatenation of the zone name and the identity of the MSA. Example for the zone "zone.example" and the MSA "msa.provider":
+
+zone.example.msa.provider. IN DNSKEY ...
+zone.example.msa.provider. IN NS ...
 
 # Migration from Single-Signer to Multi-Signer
 
