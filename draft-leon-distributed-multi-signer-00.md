@@ -6,13 +6,15 @@
 - [Multi-Signer Use Cases](#multi-signer-use-cases)
   - [Primary Use Case](#primary-use-case)
   - [Secondary Use Case](#secondary-use-case)
+  - [Tertiary Use Case](#tertiary-use-case)
 - [The Distributed Multi-Signer Model](#the-distributed-multi-signer-model)
-  - [Multi-Signer Agent: Signer vs Sidecar](#multi-signer-agent-signer-vs-sidecar)
+  - [Multi-Signer Agent: Integrated Signer vs Separate Agent](#multi-signer-agent-integrated-signer-vs-separate-agent)
   - [Source of Truth](#source-of-truth)
     - [The COMBINER](#the-combiner)
 - [Identifying the Designated Signers](#identifying-the-designated-signers)
-  - [The MSIGNER RRset](#the-msigner-rrset)
-    - [Use of the MSIGNER State Field](#use-of-the-msigner-state-field)
+- [The SIGNER RRset](#the-signer-rrset)
+  - [Semantics of the SIGNER State Field](#semantics-of-the-signer-state-field)
+  - [Semantics of the SIGNER NSMgmt Field](#semantics-of-the-signer-nsmgmt-field)
 - [Communication Between MSAs](#communication-between-msas)
   - [MSA Communication via DNS](#msa-communication-via-dns)
   - [MSA Communication via REST API](#msa-communication-via-rest-api)
@@ -31,6 +33,11 @@
 - [Synchronization of Changes Between MSAs](#synchronization-of-changes-between-msas)
   - [Leader/Follower Mode](#leaderfollower-mode)
   - [Peer Mode](#peer-mode)
+- [Responsibilities of an MSA](#responsibilities-of-an-msa)
+- [Migration from Single-Signer to Multi-Signer](#migration-from-single-signer-to-multi-signer)
+  - [Adding a single SIGNER record to an already signed zone](#adding-a-single-signer-record-to-an-already-signed-zone)
+  - [Changing the SIGNER NSMGMT Field from OWNER To MSA](#changing-the-signer-nsmgmt-field-from-owner-to-msa)
+  - [Migrating from a Multi-Signer Architecture Back to Single-Signer.](#migrating-from-a-multi-signer-architecture-back-to-single-signer)
 - [Rationale](#rationale)
   - [Separation of MSA and COMBINER](#separation-of-msa-and-combiner)
 - [Security Considerations](#security-considerations)
@@ -72,6 +79,12 @@ author:
     organization: The Swedish Internet Foundation
     country: Sweden
     email: johan.stenstam@internetstiftelsen.se
+ -
+    ins: S. Crocker
+    name: Steve Crocker
+    organization: Edgemoor Research Institute
+    country: United States
+    email: steve@shinkuro.com
 
 normative:
 
@@ -81,12 +94,12 @@ informative:
 
 # Abstract
 
-This document presents an architecture for a distributed DNS
+This document presents an architecture for a distributed DNSSEC
 multi-signer model. It defines two multi-signer specific entities:
 the "multi-signer agent" (MSA) that is responsible for the multi-signer
 process and the "combiner", which manages combination of unsigned zone
 data from the zone owner with zone data under control of the MSA. It
-introduces a new DNS RRtype, MSIGNER, that is used by the zone
+introduces a new DNS RRtype, SIGNER, that is used by the zone
 owner to designate the chosen multi-signer agents. Furthermore it
 describes a mechanism for the MSAs to establish secure communication
 with each other, either via “pure DNS” communication secured by DNS
@@ -96,7 +109,7 @@ process synchronization: “leader/follower mode” and “peer mode” and
 the mechanism by which a set of MSAs decide which model to use for a
 given zone.
 
-The scope of the document is only the distributed aspect of DNS
+The scope of the document is only the distributed aspect of DNSSEC
 multi-signer up to the point where secure communication and synchronization
 method between MSAs has been established. The “multi-signer processes” that
 deal with the actual synchronization required for multi-signer operation
@@ -125,12 +138,37 @@ other signer. The most obvious example is that each signer's
 Key-Signing Key must sign a DNSKEY RRset that contains the
 Zone-Signing Keys for all signers.
 
+To synchronize data between signers two models are possible: in a
+"centralized" model there is a single "controller" that decides what
+changes are needed. In a "distributed" model the signers themselves
+(or an agent of each signer)decide what changes are needed. 
+
+The first model has been implemented previously, and while it works from a technical
+point of view, it is not a good solution from a risk management point of
+view. The primary problem is that the signers have difficulty
+accepting that an external third party (the controller) has the ability
+to change the data (of a customer zone).
+
+This document is an attempt to address the synchronization problem by
+proposing a distributed model without a central controller.
+
 The communication between signers has two parts: first it is necessary
 to find out what data each signer has for a zone. Once all data has
 been collected it is possible to compute what changes are needed to
 the zone data at each signer. That triggers the second phase where the
 zone data for the individual signers is changed to get them in sync
-with each other.
+with each other. All of this is done automatically.
+
+However, from a slightly different perspective, the multi-signer
+alternative is the more general case of DNSSEC signing, with the (very
+common) case of a single signer being a special case. 
+
+From that point of view, this document proposes an architecture for a
+completely automated, distributed multi-signer model together with a
+seamless transition path from the current single-signer model to the
+multi-signer model. From the zone owners point of view, the transition
+is done through the addition of a new RRtype, SIGNER, that is used to
+designate the chosen multi-signer agents.
 
 Knowledge of DNS NOTIFY {{!RFC1996}} and DNS Dynamic Updates
 {{!RFC2136}} and {{!RFC3007}} is assumed. DNS SIG(0) transaction
@@ -170,8 +208,8 @@ defined as follows:
  * By engaging a set of multi-signer providers (one or more), the zone
    owner MUST give up control over the following records:
    * All DNSSEC related records in the zone
-   * The NS RRset
    * Any CDS and/or CSYNC RRsets
+   * The NS RRset (according to the zone owner's policy)
 
 # Multi-Signer Use Cases
 
@@ -184,11 +222,13 @@ contracts with two or more “multi-signer capable” service
 providers. Each such service provider provides the following service:
 
  * Receive an unsigned zone via zone transfer.
- * Locate all active signers via the MSIGNER RRset as published by the
+ * Locate all active signers via the SIGNER RRset as published by the
    zone owner. Establish secure communication with all remote signers
    (or their agents).
- * Update the NS, DNSKEY, CDS and CSYNC RRsets as needed, based on
+ * Update the DNSKEY, CDS and CSYNC RRsets as needed, based on
    synchronization with the remote signers (or their agents).
+ * Update the NS RRset if allowed by the zone owner, based on synchronization
+   with the remote signers (or their agents).
  * Sign the zone, using own DNSKEYs, but with a published DNSKEY RRset
    that includes the DNSKEYs of other signers.
  * Distribute the signed zone to a set of downstream authoritative
@@ -197,18 +237,27 @@ providers. Each such service provider provides the following service:
 ## Secondary Use Case
 
 A slightly different use case is where a zone owner has a desire to
-migrate from one DNSSEC provider to another. In the first step it
-onboards the new provider by adding an MSIGNER RR with MSIGNER
-State=“ON” identifying the new provider to the existing MSIGNER
+replace one DNSSEC provider with another. In the first step it
+onboards the new provider by adding an SIGNER RR with SIGNER
+State=“ON” identifying the new provider to the existing SIGNER
 RRset. This informs both the present providers and the incoming
 provider about the addition of a new provider and the onboarding
 process is automatically initiated.
 
-Once the onboarding operation is completed it signals the pending
-removal of another provider by changing the MSIGNER State flag for the
+Once the onboarding operation is completed the zone owner may trigger the
+pending removal of another provider by changing the SIGNER State flag for the
 outgoing signer to “OFF”. This informs all the present providers about
 the pending removal and the offboarding process is automatically
 initiated.
+
+## Tertiary Use Case
+
+The third use case is where a zone owner wants to migrate from a
+single-signer model to a multi-signer model, but as a first step only
+wants to transition the existing signer to be designated via a single
+SIGNER record. Once that is done the zone owner can continue the
+transition to a full multi-signer model at a later time by adding more
+SIGNER records.
 
 # The Distributed Multi-Signer Model
 
@@ -222,7 +271,7 @@ There are three immediate aspects for the design of a distributed
 multi-signer architecture:
 
  * The first is “synchronization”: who decides what changes are needed.
- * The second is “method”: how to communicate between the individual
+ * The second is “transport”: how to communicate between the individual
    instances in a multi-signer system.
  * The third is source of truth for different types of zone
    data. The zone owner is the source of truth for all unsigned zone
@@ -230,7 +279,7 @@ multi-signer architecture:
    of truth for all DNSSEC data in the zone. In a distributed
    multi-signer architecture the source of truth is
 
-## Multi-Signer Agent: Signer vs Sidecar
+## Multi-Signer Agent: Integrated Signer vs Separate Agent
 
 In a distributed setup there must be a service located with each
 multi-signer “signer” that manages communication with other
@@ -241,26 +290,24 @@ communication needs directly into each “signer” (i.e. typically an
 authoritative nameserver with the ability to do online DNSSEC
 signing). In this case the signer implements the MSA functionality.
 
-However, it is also possible to separate the multi-signer complexity
-into a separate service, which is sometimes referred to as
-“sidecar”. This term is used as this service sits next to the signer,
-and is under the same administrative control, but is a separate piece
-of software. When using this design each signer has a sidecar attached
-next to it. The sidecars configured as a “secondary nameserver” that
-receives the (signed) zone from the actual signer.
+However, it is also possible to separate the multi-signer functionality
+into a separate agent. This agent sits next to the signer, and is
+under the same administrative control, but is a separate piece of
+software. When using this design each signer has an agent attached
+next to it. Each agent is configured as a “secondary nameserver” to a
+signer and receives the (signed) zone from this signer.
 
-The “sidecar” design has the major advantage of leaving the signer
+The “separate agent” design has the major advantage of leaving the signer
 almost entirely out of the multi-signer complexity. The requirements
-are only that the “signer” treats the “sidecar” as a normal secondary
+are only that the “signer” treats the “agent” as a normal secondary
 (sends NOTIFY messages and responds to zone transfer requests) and
-that the “sidecar” has a configuration that allows it to make changes
+that the “agent” has a configuration that allows it to make changes
 to zones that the “signer” serves (most commonly via TSIG-signed DNS
 UPDATEs, but other models are possible).
 
-In this document the design using a separate MSA (i.e. a “sidecar”) is
-used, while pointing out that it is possible to integrate this into a
-future “signer” that implements both DNSSEC signing and the MSA
-requirements.
+In this document the design using a separate MSA is used, while pointing
+out that it is possible to integrate this into a future “signer” that
+implements both DNSSEC signing and the MSA functionality.
 
 ## Source of Truth
 
@@ -280,8 +327,24 @@ further split up into three participants:
  * The signer is the source of truth for all data generated via DNSSEC
    signing: own DNSKEYs, NSEC/NSEC3 RRs, RRSIGs, etc.
  * The MSA is the source of truth for the RRsets that must be kept in
-   sync across all the signers for the zone. This includes the zone NS
-   RRset, DNSKEYs from other signers, CDS and CSYNC RRsets.
+   sync across all the signers for the zone. This includes the DNSKEYs
+   from other signers, CDS and CSYNC RRsets. Possibly also the NS RRset.
+
+The NS RRset is an interesting special case. Traditionally the NS
+RRset is maintained by the zone owner, but based on data from the DNS
+providers (as authoritative nameservers is a primary service for the
+DNS provider). However, in a distributed multi-signer architecture the
+NS RRset should preferably be maintained by the MSA. For this reason
+the proposed design makes control of the NS RRset explicit and the
+responsibility of the zone owner to choose whether to retain control
+or delegate to the MSAs. Hence:
+
+ * The MSA is the source of truth for the NS RRset, subject to the
+   policy of the zone owner, as described in the SIGNER RRset (described
+   in #the-signer-rrset).
+
+Making the control of the NS RRset explicit is useful regardless of
+whether a zone uses multiple signers or single signer.
 
 To be able to keep the signer as simple as possible the changes to the
 NS, DNSKEY, CDS and CSYNC RRsets must be introduced into the unsigned
@@ -309,11 +372,13 @@ The COMBINER has the following features:
    the zone data received from the zone owner.
  * Whenever it receives a new unsigned zone from the zone
    owner it COMBINES zone data from the zone owner (the majority of the
-   zone) with specific zone data under control of the MSA: four
-   specific RRsets, all in the apex of the zone: the DNSKEY, NS, CDS
+   zone) with specific zone data under control of the MSA: three
+   specific RRsets, all in the apex of the zone: the DNSKEY,CDS
    and CSYNC RRsets.
+ * If zone owner policy so allows, it will also update the NS RRset with
+   the unified data from all MSAs.
  * It does not sign the zone.
-* It provides outbound zone transfer of the combined zone to the
+ * It provides outbound zone transfer of the combined zone to the
    signer.
 
 Example setup with two signers showing the logical flow of zone data
@@ -355,13 +420,14 @@ unsigned, zone that the zone owner maintains so that this RRset is
 visible to the downstream signers and their multi-signer agents.
 
 
-## The MSIGNER RRset
+# The SIGNER RRset
 
-The MSIGNER RR has the zone name that publishes the MSIGNER RRset as
-the owner name (i.e. the MSIGNER RRset must be located at the apex of
-the zone). The RDATA consists of two fields "State" and "Identity":
+The SIGNER RR has the zone name that publishes the SIGNER RRset as
+the owner name (i.e. the SIGNER RRset must be located at the apex of
+the zone). The RDATA consists of three fields "State","NSMgmt" and
+"Identity":
 
-zone.example.    MSIGNER State Identity
+zone.example.    SIGNER State NSMgmt Identity
 
 State:
     Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
@@ -369,16 +435,22 @@ State:
     are reserved for private use. The presentation format allows
     either as integers (1 or 2) or as tokens (“ON” or “OFF”).
 
+NSMgmt:
+    Unsigned 8-bit. Defined values are 1=Zone owner and 2=MSA. The value
+    0 is an error. Values 3-255 are presently undefined (and not expected
+    to be defined). The presentation format allows either as integers (1
+    or 2) or as tokens (“OWNER” or “AGENT”).
+
 Identity:
     Domain name. Used to uniquely identify the Multi-Signer Agent.
 
 Example:
 
-zone.example.   MSIGNER ON msa.example.
+zone.example.   SIGNER ON AGENT msa.example.
 
-### Use of the MSIGNER State Field
+## Semantics of the SIGNER State Field
 
-The MSIGNER State field is used to signal to all MSAs what the status of
+The SIGNER State field is used to signal to all MSAs what the status of
 each MSA is from the point-of-view of the zone owner. The two possible
 values are "ON" and "OFF" where "ON" means that the MSA is a currently
 designated signer for the zone and "OFF" means that the MSA is previously
@@ -390,8 +462,22 @@ which signer is being offboarded so that the correct data may be removed
 in the correct order during the multi-signer "remove signer" process
 (see {{!RFC8901}}).
 
-Once the offboarding process is complete the MSIGNER RR for the offboarded 
+Once the offboarding process is complete the SIGNER RR for the offboarded 
 MSA may be removed from the zone at the zone owners discretion.
+
+## Semantics of the SIGNER NSMgmt Field
+
+The NSMgmt field is used to signal to the MSAs who is responsible for
+the NS RRset for the zone. The two possible values are "OWNER" and "AGENT".
+
+The value "OWNER" means that the zone owner is responsible for the NS
+RRset and is responsible for updating the NS RRset with the unified data
+from all MSAs. In this case the COMBINER MUST NOT in any way modify the NS
+RRset as received from the zone owner.
+
+The value "AGENT" means that the MSA is responsible for the contents of the NS
+RRset. In this case the COMBINER MUST ensure that the NS RRset is updated
+with the unified NS RRset data from all MSAs.
 
 # Communication Between MSAs
 
@@ -447,18 +533,18 @@ straight-forward.
 ## Locating Remote Multi-Signer Agents
 
 When an MSA receives a zone via zone transfer from the signer it will
-analyze the zone to see whether it contains an MSIGNER RRset. If there
-is no MSIGNER RRset the zone MUST be ignored by the MSA from the
+analyze the zone to see whether it contains an SIGNER RRset. If there
+is no SIGNER RRset the zone MUST be ignored by the MSA from the
 point-of-view of multi-signer synchronization.
 
-If, however, the zone does contain an MSIGNER RRset then the MSA must
+If, however, the zone does contain an SIGNER RRset then the MSA must
 analyze this RRset to identify the other MSAs for the zone via their
-target names in each MSIGNER record. If any of the other MSAs listed
-in the MSIGNER RRset is previously unknown to this MSA then secure
+target names in each SIGNER record. If any of the other MSAs listed
+in the SIGNER RRset is previously unknown to this MSA then secure
 communication with this other MSA must be established. 
 
 Secure communication can be achieved via various transports and it is up to the
-MSAs in the zone's MSIGNER records to determine amongst themselves. In this
+MSAs in the zone's SIGNER records to determine amongst themselves. In this
 document we propose two transports: DNS and API. We also establish DNS as a
 baseline that MSAs MUST support to be compliant.
 
@@ -470,7 +556,7 @@ and establish secure DNS-based and API-based communications, respectively.
 Locating a remote MSA using the DNS mechanism consists of the
 following steps:
 
- * Lookup and DNSSEC-validate a URI record for the MSIGNER identity.
+ * Lookup and DNSSEC-validate a URI record for the SIGNER identity.
    This provides the domain name and port to which DNS messages should be sent.
  * Lookup and DNSSEC-validate the SVCB record of the URI record target to
    get the IP addresses to use for communication with the remote MSA.
@@ -478,9 +564,9 @@ following steps:
    This enables verification of the SIG(0) public key of the remote MSA
    once communication starts.
 
-Example: given the following MSIGNER record for a remote MSA:
+Example: given the following SIGNER record for a remote MSA:
 
-zone.example.     IN MSIGNER ON msa.provider.com.
+zone.example.     IN SIGNER ON msa.provider.com.
 
 The local MSA will look up the URI record for msa.provider.com:
 
@@ -511,7 +597,7 @@ validated KEY record for the remote MSAs SIG(0) public key.
 Locating a remote MSA using the API mechanism consists of the following steps:
 
 * Lookup and DNSSEC-validate the URI record for for the HTTPS protocol for
-  the MSIGNER identity. This provides the base URL that will be
+  the SIGNER identity. This provides the base URL that will be
   used to construct the individual API endpoints for the REST API. It
   also provides the port to use.
 * Lookup and DNSSEC-validate the SVCB record for the URI record target.
@@ -520,9 +606,9 @@ Locating a remote MSA using the API mechanism consists of the following steps:
   specified in the URI record. This will enable verification of the
   certificate of the remote MSA once communication starts.
 
-Example: given the following MSIGNER record for a remote MSA:
+Example: given the following SIGNER record for a remote MSA:
 
-zone.example.     IN MSIGNER ON  msa.provider.com.
+zone.example.     IN SIGNER ON  msa.provider.com.
 
 the local MSA will look up the URI record for msa.provider.com:
 
@@ -715,7 +801,7 @@ sequence diagram below.
 The procedure is as follows:
 
 1. The multisigner agents receive a zone via zone transfer. By
-   analyzing the MSIGNER RRset each MSA become aware of the identities
+   analyzing the SIGNER RRset each MSA become aware of the identities
    of the other MSAs for the zone. I.e. each MSA knows which other
    MSAs it needs to communicate with.  Communication with each of
    these, previously unknown, remote MSAs is referred to as "NEEDED".
@@ -818,6 +904,79 @@ reduced to a notification mechanism (“I am now in state N”), although
 authenticated to avoid having the contents of this communication
 become an attack vector for an adversary.
 
+# Responsibilities of an MSA
+
+For a group of MSAs to be able to communicate securely and synchronize
+data for a zone, each MSA must:
+
+* Publish the DNS records needed for secure communication with other MSAs:
+  * URI, SVCB and KEY records required for DNS-based communication secured by SIG(0).
+  * URI, SVCB and TLSA records required for API-based communication secured by TLS (if supported).
+  * All of the above MUST be published in a DNSSEC-signed zone under the domain name that is the identity of the MSA.
+  
+* For each zone that is managed, publish the data needed for synchronization with other MSAs:
+  * The DNSKEY RRset for the zone consisting of the DNSKEYS that the local signer uses to sign the zone.
+  * The CDS RRset for the zone, representing the KSK that the local signer uses to sign the zone (when needed).
+  * The NS RRset for the zone, consisting of the NS records of the authoritative nameserver that the local signer distributes the signed zone to.
+  * All of the above MUST be published in a DNSSEC-signed zone under the domain name that is the concatenation of the zone name and the identity of the MSA. Example for the zone "zone.example" and the MSA "msa.provider":
+
+zone.example.msa.provider. IN DNSKEY ...
+zone.example.msa.provider. IN NS ...
+
+# Migration from Single-Signer to Multi-Signer
+
+The migration from a single-signer to a multi-signer architecture is
+done by adding the SIGNER RRset to the zone. However, this may be
+done in several steps.
+
+## Adding a single SIGNER record to an already signed zone
+
+Adding a single SIGNER record to a zone that is already signed by
+the DNS provider "provider.com" with NSMGMT=OWNER is a no-op that
+does not change anything:
+
+zone.example. IN SIGNER ON OWNER msa.provider.com.
+
+The zone was already signed by the DNS provider "provider.com" and
+the provider added any needed DNSSEC records, including DNSKEYs. The
+zone NS RRset was managed by the zone owner. All of this is unchanged
+by the addition of the SIGNER RRset.
+
+## Changing the SIGNER NSMGMT Field from OWNER To MSA
+
+In a multi-signer architecture each MSA publishes the data it contributes to
+the zone under the domain name {zone}.{identity}. I.e. the zone DNSKEYs that
+the MSA msa.provider. uses are published as
+
+zone.example.msa.provider. DNSKEY ...
+zone.example.msa.provider. DNSKEY ...
+
+Likewise, the NS records for the zone are published as
+
+zone.example.ns.msa.provider. NS ...
+zone.example.ns.msa.provider. NS ...
+
+To migrate from "owner maintained" NS RRset to "MSA maintained", the 
+zone owner must verify that the NS RRset as published by the MSA is
+correct and in sync with the NS RRset as published by the zone owner itself.
+After this verification the zone owner changes the SIGNER NSMGMT field in the
+existing SIGNER record from NSMGMT=OWNER to NSMGMT=MSA.
+
+## Migrating from a Multi-Signer Architecture Back to Single-Signer.
+
+If for some reason a zone owner wants to migrate back to a single-signer
+architecture, the process is essentially the reverse of the migration from
+single-signer to multi-signer:
+
+1. The zone owner offboards all MSAs but one (the one that will be the single-signer)
+2. The zone owner must verify that the NS RRset it publishes (in the unsigned zone) 
+   is correct and in sync with the NS RRset as published by the remaining MSA.
+3. The zone owner changes the SIGNER NSMGMT field in the SIGNER record from
+   NSMGMT=MSA to NSMGMT=OWNER. 
+
+The zone is now essentially back to a single-signer architecture.
+The remaining SIGNER record may be removed from the zone.
+
 TO BE REMOVED BEFORE PUBLICATION:
 # Rationale
 
@@ -838,6 +997,14 @@ significant amount of automation. The authors believe that the only
 way to make a multi-signer architecture useful in practice is via
 automation. However, automation is a double-edged sword. It can both
 make the system more robust and more vulnerable.
+
+While all communication between MSAs is authenticated (either via SIG(0)
+signatures ore TLS), the signalling from the zone owner to the MSAs is
+via the SIGNER RRset in an unsigned zone. This is a potential attack
+vector. However, securing zone transfers from zone owner to DNS providers
+is a well-known issue with lots of existing solutions (TSIG, zone transfer
+via a secure channel, zone transfer-over-TLS, etc). Employing some of these
+solutions is strongly recommended.
 
 From a vulnerability point-of-view this architecture introduces
 several new components into the zone signing and publication
