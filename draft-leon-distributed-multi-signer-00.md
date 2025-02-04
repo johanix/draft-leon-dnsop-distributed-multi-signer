@@ -11,10 +11,12 @@
   - [Multi-Signer Agent: Integrated Signer vs Separate Agent](#multi-signer-agent-integrated-signer-vs-separate-agent)
   - [Source of Truth](#source-of-truth)
     - [The COMBINER](#the-combiner)
+  - [The DNS Provider](#the-dns-provider)
 - [Identifying the Designated Signers](#identifying-the-designated-signers)
 - [The HSYNC RRset](#the-hsync-rrset)
   - [Semantics of the HSYNC State Field](#semantics-of-the-hsync-state-field)
   - [Semantics of the HSYNC NSMgmt Field](#semantics-of-the-hsync-nsmgmt-field)
+  - [Semantics of the HSYNC Sign Field](#semantics-of-the-hsync-sign-field)
 - [Communication Between MSAs](#communication-between-msas)
   - [MSA Communication via DNS](#msa-communication-via-dns)
   - [MSA Communication via REST API](#msa-communication-via-rest-api)
@@ -39,6 +41,7 @@
   - [Changing the HSYNC NSMGMT Field from AGENT To OWNER](#changing-the-hsync-nsmgmt-field-from-agent-to-owner)
   - [Migrating from a Multi-Signer Architecture Back to Single-Signer.](#migrating-from-a-multi-signer-architecture-back-to-single-signer)
 - [Rationale](#rationale)
+  - [Choice of the HSYNC Mnemonic](#choice-of-the-hsync-mnemonic)
   - [Separation of MSA and COMBINER](#separation-of-msa-and-combiner)
 - [Security Considerations](#security-considerations)
 - [IANA Considerations.](#iana-considerations)
@@ -381,8 +384,9 @@ The COMBINER has the following features:
    with specific zone data under control of the MSA: three specific
    RRsets, all in the apex of the zone: the DNSKEY,CDS and CSYNC
    RRsets.
- * If zone owner policy so allows, it will also update the NS RRset
-   with the unified data from all MSAs.
+ * It is policy free. I.e. the COMBINER is not making any judgement
+   about what data to include in the zone from the four defined
+   RRsets.  That judgement is the role of the MSA.
  * It does not sign the zone.
  * It provides outbound zone transfer of the combined zone to the
    signer.
@@ -413,6 +417,27 @@ between the zone owner, the COMBINER, the signer and the MSA:
              +-----+                                              +---+
 ~~~
 
+## The DNS Provider
+
+A "DNS Provider" is a term that is most commonly used to refer to an
+entity that provides authoritative DNS service to one or more zone
+owners. In the context of this document it is used to refer to an
+entity that provides some subset of the following services:
+
+ * Signing a zone received from the zone owner.
+ * Serving the zone via a set of authoritative nameservers.
+ * Distributing the signed zone to other downstream DNS Providers.
+
+In addition to the above services a DNS Provider MUST also provide:
+
+* An MSA for synchronization with other DNS Providers
+* A COMBINER for the management of changes to the zone via  
+  the synchronization among MSAs (if it provides a signer)
+
+I.e. in the setup above there are two DNS Providers, both of which are
+"complete" in the sense that they provide all three of the above
+services.
+
 # Identifying the Designated Signers 
 
 It is the responsibility of the zone owner to choose a set of
@@ -423,7 +448,7 @@ and consisting of one HSYNC record for each signer.
 
 The HSYNC RRset must be added, by the zone owner, to the, typically
 unsigned, zone that the zone owner maintains so that this RRset is
-visible to the downstream signers and their multi-signer agents.
+visible to the downstream DNS Providers and their multi-signer agents.
 
 
 # The HSYNC RRset
@@ -433,7 +458,7 @@ the owner name (i.e. the HSYNC RRset must be located at the apex of
 the zone). The RDATA consists of three fields "State","NSMgmt" and
 "Identity":
 
-zone.example.    HSYNC State NSMgmt Identity
+zone.example.    IN HSYNC  State  NSMgmt  Sign  Identity.
 
 State:
     Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
@@ -442,25 +467,31 @@ State:
     either as integers (1 or 2) or as tokens (“ON” or “OFF”).
 
 NSMgmt:
-    Unsigned 8-bit. Defined values are 1=Zone owner and 2=MSA. The value
-    0 is an error. Values 3-255 are presently undefined (and not expected
-    to be defined). The presentation format allows either as integers (1
-    or 2) or as tokens (“OWNER” or “AGENT”).
+    Unsigned 8-bit. Defined values are 1=Zone owner and 2=MSA. The
+    value 0 is an error. Values 3-255 are presently undefined (and not
+    expected to be defined). The presentation format allows either as
+    integers (1 or 2) or as tokens (“OWNER” or “AGENT”).
+
+Sign:
+    Unsigned 8-bit. Defined values are 1=YES and 2=NO. The value 0 is an
+    error. If Sign=YES for a particular HSYNC record, then the signer
+    associated with that Identity is a designated signer for the zone.
 
 Identity:
-    Domain name. Used to uniquely identify the Multi-Signer Agent.
+    Domain name. Used to uniquely identify the Multi-Signer
+    Agent for the DNS Provider that the MSA represents.
 
 Example:
 
-zone.example.   HSYNC ON AGENT msa.example.
+zone.example.   IN HSYNC  ON  AGENT  YES  msa.provider.example.
 
 ## Semantics of the HSYNC State Field
 
-The HSYNC State field is used to signal to all MSAs what the status
-of each MSA is from the point-of-view of the zone owner. The two
-possible values are "ON" and "OFF" where "ON" means that the MSA is a
-currently designated signer for the zone and "OFF" means that the MSA
-is previously designated signer for the zone that is in the process of
+The HSYNC State field is used to signal to all MSAs what the status of
+each MSA is from the point-of-view of the zone owner. The two possible
+values are "ON" and "OFF" where "ON" means that the MSA is a currently
+designated signer for the zone and "OFF" means that the MSA is
+previously designated signer for the zone that is in the process of
 being offboarded.
 
 The reason for the "OFF" state is that the offboarding process
@@ -476,17 +507,30 @@ discretion.
 ## Semantics of the HSYNC NSMgmt Field
 
 The NSMgmt field is used to signal to the MSAs who is responsible for
-the NS RRset for the zone. The two possible values are "OWNER" and
-"AGENT".
+the contents of the NS RRset for the zone. The two possible values are
+"OWNER" and "AGENT".
 
-The value "OWNER" means that the zone owner is responsible for the NS
-RRset and is responsible for updating the NS RRset with the unified
-data from all MSAs. In this case the COMBINER MUST NOT in any way
-modify the NS RRset as received from the zone owner.
+The value "OWNER" signals that the zone owner is responsible for the NS
+RRset and is responsible for updating the NS RRset (either with or
+without the unified data from all MSAs). In this case the MSAs MUST NOT
+instruct the COMBINER to update the NS RRset.
 
-The value "AGENT" means that the MSA is responsible for the contents
-of the NS RRset. In this case the COMBINER MUST ensure that the NS
-RRset is updated with the unified NS RRset data from all MSAs.
+The value "AGENT" means that the MSAs representing DNS Providers that
+sign the zone are responsible for the contents of the NS RRset. In
+this case the these MSAs MUST instruct the COMBINER to update the NS
+RRset with the unified NS RRset data from all MSAs.
+
+## Semantics of the HSYNC Sign Field
+
+The Sign field is used to signal to all MSAs whether the zone owner
+requests that the DNS Provider that the MSA represents should sign the
+zone or not. The two possible values are "YES" and "NO" where "YES"
+means that the MSA represents a currently designated signer for the
+zone and "NO" means that the MSA does not.
+
+When Sign=NO the MSA MUST still participate in the communication
+between MSAs for the zone, but MUST NOT instruct the COMBINER to
+update the NS RRset.
 
 # Communication Between MSAs
 
@@ -515,6 +559,13 @@ The two defined synchronization alternatives are:
 
 Just as for transport, supported synchronization models are signaled
 in the Multi-Signer EDNS(0) Option (see section NNN below).
+
+Regardless of the synchronization model and communication method used,
+the MSAs SHOULD exchange all needed information about the zone and the
+DNS Provider they represent to enable the multi-signer processes to
+execute correctly. This includes notifications about changes to
+DNSKEYs, changes to the NS RRset, etc. Depending on synchronization
+model it may also include instructions for changes to the zone.
 
  ## MSA Communication via DNS
 
@@ -581,7 +632,7 @@ following steps:
 
 Example: given the following HSYNC record for a remote MSA:
 
-zone.example.     IN HSYNC ON AGENT msa.provider.com.
+zone.example.     IN HSYNC  ON  AGENT  YES  msa.provider.com.
 
 The local MSA will look up the URI record for msa.provider.com:
 
@@ -613,9 +664,9 @@ Locating a remote MSA using the API mechanism consists of the
 following steps:
 
 * Lookup and DNSSEC-validate the URI record for for the HTTPS protocol
-  for the HSYNC identity. This provides the base URL that will be
-  used to construct the individual API endpoints for the REST API. It
-  also provides the port to use.
+  for the HSYNC identity. This provides the base URL that will be used
+  to construct the individual API endpoints for the REST API. It also
+  provides the port to use.
 * Lookup and DNSSEC-validate the SVCB record for the URI record
   target.  This provides the IP-addresses to use for communication
   with the MSA.
@@ -625,7 +676,7 @@ following steps:
 
 Example: given the following HSYNC record for a remote MSA:
 
-zone.example.     IN HSYNC ON AGENT msa.provider.com.
+zone.example.     IN HSYNC  ON  AGENT  YES  msa.provider.com.
 
 the local MSA will look up the URI record for msa.provider.com:
 
@@ -898,7 +949,7 @@ RCODE=NOERROR.
 
 There are two defined models for synchronization. The first
 (Leader/Follower) has the advantage of more clearly mapping to the
-original multi-signer model, with a single controller. The second
+original multi-signer model 2, with a single controller. The second
 model has the advantage of less total communication between MSAs
 (including no elections) but the potential disadvantage of more fine
 grained communication during the execution of a multi-signer process.
@@ -970,7 +1021,7 @@ Adding a single HSYNC record to a zone that is already signed by the
 DNS provider "provider.com" with NSMGMT=OWNER is a no-op that does not
 change anything:
 
-zone.example. IN HSYNC ON AGENT msa.provider.com.
+zone.example. IN HSYNC  ON  AGENT  YES  msa.provider.com.
 
 The zone was already signed by the DNS provider "provider.com" and the
 provider added any needed DNSSEC records, including DNSKEYs. The zone
@@ -1019,10 +1070,23 @@ The remaining HSYNC record may be removed from the zone.
 TO BE REMOVED BEFORE PUBLICATION:
 # Rationale
 
+## Choice of the HSYNC Mnemonic
+
+Initially the mnemonic MSIGNER was used for the HSYNC RRset. However,
+as work progressed it became clear that we want also non-signing DNS
+Providers to be able to participate. So the RRset is a signalling
+mehanism from zone owner to DNS Providers, some of which may or may
+not be instructed to sign the zone. Therefore we suggest the mnemonic
+HSYNC to indicate that this is a mechanism for "horizontal
+synchronization" inside a zone.
+
+But the mnemonic chosen is a very minor point and should a better
+suggestion come up it would be great.
+
 ## Separation of MSA and COMBINER
 
-It is possible to integrate all three multi-signer components (signer,
-msa and combiner) into a single piece of software (or two pieces,
+It is possible to integrate all three multi-signer components (SIGNER,
+MSA and COMBINER) into a single piece of software (or two pieces,
 depending on the preferred way of slicing the functionality). However,
 such a composite module would be a fairly complex piece of software.
 This document aims to describe the functional separation of the
