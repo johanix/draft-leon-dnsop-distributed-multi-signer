@@ -12,9 +12,9 @@
   - [Source of Truth](#source-of-truth)
     - [The COMBINER](#the-combiner)
 - [Identifying the Designated Signers](#identifying-the-designated-signers)
-- [The SIGNER RRset](#the-signer-rrset)
-  - [Semantics of the SIGNER State Field](#semantics-of-the-signer-state-field)
-  - [Semantics of the SIGNER NSMgmt Field](#semantics-of-the-signer-nsmgmt-field)
+- [The HSYNC RRset](#the-hsync-rrset)
+  - [Semantics of the HSYNC State Field](#semantics-of-the-hsync-state-field)
+  - [Semantics of the HSYNC NSMgmt Field](#semantics-of-the-hsync-nsmgmt-field)
 - [Communication Between MSAs](#communication-between-msas)
   - [MSA Communication via DNS](#msa-communication-via-dns)
   - [MSA Communication via REST API](#msa-communication-via-rest-api)
@@ -35,8 +35,8 @@
   - [Peer Mode](#peer-mode)
 - [Responsibilities of an MSA](#responsibilities-of-an-msa)
 - [Migration from Single-Signer to Multi-Signer](#migration-from-single-signer-to-multi-signer)
-  - [Adding a single SIGNER record to an already signed zone](#adding-a-single-signer-record-to-an-already-signed-zone)
-  - [Changing the SIGNER NSMGMT Field from OWNER To MSA](#changing-the-signer-nsmgmt-field-from-owner-to-msa)
+  - [Adding a single HSYNC record to an already signed zone](#adding-a-single-hsync-record-to-an-already-signed-zone)
+  - [Changing the HSYNC NSMGMT Field from AGENT To OWNER](#changing-the-hsync-nsmgmt-field-from-agent-to-owner)
   - [Migrating from a Multi-Signer Architecture Back to Single-Signer.](#migrating-from-a-multi-signer-architecture-back-to-single-signer)
 - [Rationale](#rationale)
   - [Separation of MSA and COMBINER](#separation-of-msa-and-combiner)
@@ -418,22 +418,22 @@ between the zone owner, the COMBINER, the signer and the MSA:
 It is the responsibility of the zone owner to choose a set of
 “signers”, either internal or external to the zone owners
 organization. These signers must be clearly and uniquely designated
-via publication in the MSIGNER RRset, located at the apex of the zone
-and consisting of one MSIGNER record for each signer.
+via publication in the HSYNC RRset, located at the apex of the zone
+and consisting of one HSYNC record for each signer.
 
-The MSIGNER RRset must be added, by the zone owner, to the, typically
+The HSYNC RRset must be added, by the zone owner, to the, typically
 unsigned, zone that the zone owner maintains so that this RRset is
 visible to the downstream signers and their multi-signer agents.
 
 
-# The SIGNER RRset
+# The HSYNC RRset
 
-The SIGNER RR has the zone name that publishes the SIGNER RRset as
-the owner name (i.e. the SIGNER RRset must be located at the apex of
+The HSYNC RR has the zone name that publishes the HSYNC RRset as
+the owner name (i.e. the HSYNC RRset must be located at the apex of
 the zone). The RDATA consists of three fields "State","NSMgmt" and
 "Identity":
 
-zone.example.    SIGNER State NSMgmt Identity
+zone.example.    HSYNC State NSMgmt Identity
 
 State:
     Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
@@ -452,11 +452,11 @@ Identity:
 
 Example:
 
-zone.example.   SIGNER ON AGENT msa.example.
+zone.example.   HSYNC ON AGENT msa.example.
 
-## Semantics of the SIGNER State Field
+## Semantics of the HSYNC State Field
 
-The SIGNER State field is used to signal to all MSAs what the status
+The HSYNC State field is used to signal to all MSAs what the status
 of each MSA is from the point-of-view of the zone owner. The two
 possible values are "ON" and "OFF" where "ON" means that the MSA is a
 currently designated signer for the zone and "OFF" means that the MSA
@@ -469,11 +469,11 @@ important to know which signer is being offboarded so that the correct
 data may be removed in the correct order during the multi-signer
 "remove signer" process (see {{!RFC8901}}).
 
-Once the offboarding process is complete the SIGNER RR for the
+Once the offboarding process is complete the HSYNC RR for the
 offboarded MSA may be removed from the zone at the zone owners
 discretion.
 
-## Semantics of the SIGNER NSMgmt Field
+## Semantics of the HSYNC NSMgmt Field
 
 The NSMgmt field is used to signal to the MSAs who is responsible for
 the NS RRset for the zone. The two possible values are "OWNER" and
@@ -544,18 +544,18 @@ straight-forward.
 ## Locating Remote Multi-Signer Agents
 
 When an MSA receives a zone via zone transfer from the signer it will
-analyze the zone to see whether it contains an SIGNER RRset. If there
-is no SIGNER RRset the zone MUST be ignored by the MSA from the
+analyze the zone to see whether it contains an HSYNC RRset. If there
+is no HSYNC RRset the zone MUST be ignored by the MSA from the
 point-of-view of multi-signer synchronization.
 
-If, however, the zone does contain an SIGNER RRset then the MSA must
+If, however, the zone does contain an HSYNC RRset then the MSA must
 analyze this RRset to identify the other MSAs for the zone via their
-target names in each SIGNER record. If any of the other MSAs listed in
-the SIGNER RRset is previously unknown to this MSA then secure
+target names in each HSYNC record. If any of the other MSAs listed in
+the HSYNC RRset is previously unknown to this MSA then secure
 communication with this other MSA must be established.
 
 Secure communication can be achieved via various transports and it is
-up to the MSAs in the zone's SIGNER records to determine amongst
+up to the MSAs in the zone's HSYNC records to determine amongst
 themselves. In this document we propose two transports: DNS and
 API. We also establish DNS as a baseline that MSAs MUST support to be
 compliant.
@@ -569,7 +569,7 @@ communications, respectively.
 Locating a remote MSA using the DNS mechanism consists of the
 following steps:
 
- * Lookup and DNSSEC-validate a URI record for the SIGNER identity.
+ * Lookup and DNSSEC-validate a URI record for the HSYNC identity.
    This provides the domain name and port to which DNS messages should
    be sent.
  * Lookup and DNSSEC-validate the SVCB record of the URI record target
@@ -579,9 +579,9 @@ following steps:
    name.  This enables verification of the SIG(0) public key of the
    remote MSA once communication starts.
 
-Example: given the following SIGNER record for a remote MSA:
+Example: given the following HSYNC record for a remote MSA:
 
-zone.example.     IN SIGNER ON msa.provider.com.
+zone.example.     IN HSYNC ON AGENT msa.provider.com.
 
 The local MSA will look up the URI record for msa.provider.com:
 
@@ -613,7 +613,7 @@ Locating a remote MSA using the API mechanism consists of the
 following steps:
 
 * Lookup and DNSSEC-validate the URI record for for the HTTPS protocol
-  for the SIGNER identity. This provides the base URL that will be
+  for the HSYNC identity. This provides the base URL that will be
   used to construct the individual API endpoints for the REST API. It
   also provides the port to use.
 * Lookup and DNSSEC-validate the SVCB record for the URI record
@@ -623,9 +623,9 @@ following steps:
   specified in the URI record. This will enable verification of the
   certificate of the remote MSA once communication starts.
 
-Example: given the following SIGNER record for a remote MSA:
+Example: given the following HSYNC record for a remote MSA:
 
-zone.example.     IN SIGNER ON  msa.provider.com.
+zone.example.     IN HSYNC ON AGENT msa.provider.com.
 
 the local MSA will look up the URI record for msa.provider.com:
 
@@ -824,7 +824,7 @@ sequence diagram below.
 The procedure is as follows:
 
 1. The multisigner agents receive a zone via zone transfer. By
-   analyzing the SIGNER RRset each MSA become aware of the identities
+   analyzing the HSYNC RRset each MSA become aware of the identities
    of the other MSAs for the zone. I.e. each MSA knows which other
    MSAs it needs to communicate with.  Communication with each of
    these, previously unknown, remote MSAs is referred to as "NEEDED".
@@ -961,23 +961,23 @@ zone.example.msa.provider. IN NS ...
 # Migration from Single-Signer to Multi-Signer
 
 The migration from a single-signer to a multi-signer architecture is
-done by adding the SIGNER RRset to the zone. However, this may be done
+done by adding the HSYNC RRset to the zone. However, this may be done
 in several steps.
 
-## Adding a single SIGNER record to an already signed zone
+## Adding a single HSYNC record to an already signed zone
 
-Adding a single SIGNER record to a zone that is already signed by the
+Adding a single HSYNC record to a zone that is already signed by the
 DNS provider "provider.com" with NSMGMT=OWNER is a no-op that does not
 change anything:
 
-zone.example. IN SIGNER ON OWNER msa.provider.com.
+zone.example. IN HSYNC ON AGENT msa.provider.com.
 
 The zone was already signed by the DNS provider "provider.com" and the
 provider added any needed DNSSEC records, including DNSKEYs. The zone
 NS RRset was managed by the zone owner. All of this is unchanged by
-the addition of the SIGNER RRset.
+the addition of the HSYNC RRset.
 
-## Changing the SIGNER NSMGMT Field from OWNER To MSA
+## Changing the HSYNC NSMGMT Field from AGENT To OWNER
 
 In a multi-signer architecture each MSA publishes the data it
 contributes to the zone under the domain name
@@ -995,8 +995,8 @@ zone.example.ns.msa.provider. NS ...
 To migrate from "owner maintained" NS RRset to "MSA maintained", the
 zone owner must verify that the NS RRset as published by the MSA is
 correct and in sync with the NS RRset as published by the zone owner
-itself.  After this verification the zone owner changes the SIGNER
-NSMGMT field in the existing SIGNER record from NSMGMT=OWNER to
+itself.  After this verification the zone owner changes the HSYNC
+NSMGMT field in the existing HSYNC record from NSMGMT=OWNER to
 NSMGMT=AGENT.
 
 ## Migrating from a Multi-Signer Architecture Back to Single-Signer.
@@ -1010,11 +1010,11 @@ the migration from single-signer to multi-signer:
 2. The zone owner must verify that the NS RRset it publishes (in the
    unsigned zone) is correct and in sync with the NS RRset as
    published by the remaining MSA.
-3. The zone owner changes the SIGNER NSMGMT field in the SIGNER record
+3. The zone owner changes the HSYNC NSMGMT field in the HSYNC record
    from NSMGMT=MSA to NSMGMT=OWNER.
 
 The zone is now essentially back to a single-signer architecture.
-The remaining SIGNER record may be removed from the zone.
+The remaining HSYNC record may be removed from the zone.
 
 TO BE REMOVED BEFORE PUBLICATION:
 # Rationale
@@ -1040,7 +1040,7 @@ make the system more robust and more vulnerable.
 
 While all communication between MSAs is authenticated (either via
 SIG(0) signatures ore TLS), the signalling from the zone owner to the
-MSAs is via the SIGNER RRset in an unsigned zone. This is a potential
+MSAs is via the HSYNC RRset in an unsigned zone. This is a potential
 attack vector. However, securing zone transfers from zone owner to DNS
 providers is a well-known issue with lots of existing solutions (TSIG,
 zone transfer via a secure channel, zone transfer-over-TLS,
