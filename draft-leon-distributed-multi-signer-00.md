@@ -542,7 +542,7 @@ execute correctly. This includes notifications about changes to
 DNSKEYs, changes to the NS RRset, etc. Depending on synchronization
 model it may also include instructions for changes to the zone.
 
- ## MSA Communication via DNS
+## MSA Communication via DNS
 
 This transport alternative is based on the observation that all the
 communication needs between MSAs can be expressed via DNS
@@ -553,9 +553,9 @@ information about the current state between MSAs in an ongoing
 multi-signer process. For this reason a dedicated EDNS(0) opcode
 specifically for multi-signer synchronization is proposed.
 
-This model is based on {{!draft-berra…}} that solves a similar problem
-for delegation synchronization between child and parent, which has
-already been implemented and shown to work.
+This model is based on {{!draft-berra-dnsop-opt-keystate}} that solves
+a similar problem for delegation synchronization between child and
+parent, which has already been implemented and shown to work.
 
 ## MSA Communication via REST API
 
@@ -578,29 +578,31 @@ If, however, the zone does contain an HSYNC RRset then the MSA must
 analyze this RRset to identify the other MSAs for the zone via their
 target names in each HSYNC record. If any of the other MSAs listed in
 the HSYNC RRset is previously unknown to this MSA then secure
-communication with this other MSA must be established.
+communication with this other MSA MUST be established.
 
 Secure communication can be achieved via various transports and it is
 up to the MSAs in the zone's HSYNC records to determine amongst
-themselves. In this document we propose two transports: DNS and
-API. We also establish DNS as a baseline that MSAs MUST support to be
-compliant.
+themselves. This document proposes two transports: "DNS" and
+"API". "DNS" is designated as as a baseline that MSAs MUST support to
+be compliant.
 
-In the following two subsections we detail how an MSA can locate a
-remote MSA and establish secure DNS-based and API-based
-communications, respectively.
+The following two subsections describe the mechanism by which an MSA
+SHOULD locate a remote MSA and establish secure DNS-based and
+API-based communications, respectively.
 
 ### Locating a Remote DNS-Method Multi-Signer Agent
 
 Locating a remote MSA using the DNS mechanism consists of the
 following steps:
 
- * Lookup and DNSSEC-validate a URI record for the HSYNC identity.
-   This provides the domain name and port to which DNS messages should
-   be sent.
+ * Lookup and DNSSEC-validate a URI record for the DNS protocol for
+   the HSYNC identity. This provides the domain name and port to
+   which DNS messages should be sent.
  * Lookup and DNSSEC-validate the SVCB record of the URI record target
    to get the IP addresses to use for communication with the remote
-   MSA.
+   MSA. If the returned SVCB record includes a "port=NNN" hint then
+   this MUST be ignored. I.e. the port to use is defined by the URI
+   record.
  * Lookup and DNSSEC-validate the KEY record of the URI record target
    name.  This enables verification of the SIG(0) public key of the
    remote MSA once communication starts.
@@ -619,13 +621,13 @@ and IPv6 addresses as ipv4hints and ipv6hints in the response to the
 SVCB query:
 
 ns.msa.provider.com.   IN  SVCB  1 ipv4hint=5.6.7.8 ipv6hint=2001::53
-ns.msa.provider.com.   IN RRSIG SVCB …
+ns.msa.provider.com.   IN  RRSIG SVCB …
 
 and also a look up for the KEY record for ns.msa.provider.com, which
 may look like this:
 
-ns.msa.provider.com.  IN KEY …
-ns.msa.provider.com.  IN RRSIG KEY …
+ns.msa.provider.com.  IN  KEY …
+ns.msa.provider.com.  IN  RRSIG KEY …
 
 Once all the DNS lookups and DNSSEC-validation of the returned data
 has been done, the local MSA is able to initiate communication with
@@ -644,7 +646,9 @@ following steps:
   provides the port to use.
 * Lookup and DNSSEC-validate the SVCB record for the URI record
   target.  This provides the IP-addresses to use for communication
-  with the MSA.
+  with the MSA. If the returned SVCB record includes a "port=NNN" hint
+  then this MUST be ignored. I.e. the port to use is defined by the
+  URI record.
 * Lookup and DNSSEC-validate the TLSA record for the port and protocol
   specified in the URI record. This will enable verification of the
   certificate of the remote MSA once communication starts.
@@ -690,6 +694,11 @@ When two MSAs need to communicate with each other for the first time
 need to establish secure communication. This is done in a "HELLO"
 phase where the MSAs exchange information about their capabilities.
 
+If all the information needed for API-based transport for the remote
+party was available, the MSA SHOULD attempt an API-based HELLO. If,
+however, this fails for some reason, it should fall back to DNS-based
+HELLO.
+
 ### DNS-based HELLO Phase
 
 When using DNS-based communication the HELLO phase is done by sending
@@ -730,7 +739,7 @@ as a group. It can then use this information to determine which
 transport to use:
 
 * If all MSAs support API-based communication, the MSAs will use
-  API-based communication.
+  API-based communication for this zone.
 * If one or more MSAs only support DNS-based communication, the MSAs
   will use DNS-based communication for this zone.
 
@@ -746,8 +755,17 @@ other MSAs and can determine which synchronization model to use:
 ## Multi-Signer EDNS(0) Option Format 
 
 This document uses an Extended Mechanism for DNS (EDNS0) {{!RFC6891}}
-option to include Key State information in DNS messages. The option is
-structured as follows:
+option to include Multi-Signer synchronization information in DNS
+messages.
+
+This option is structured the same way as the KeyState option
+described in {{?draft-berra-dnsop-opt-keystate}}, which has been
+implemented and shown to work for a similar use case. The requirements
+for multi-signer synchronization are sufficiently different that it is
+not possible to re-use the KeyState OPT also for this purpose and
+therefore a new EDNS(0) option is defined here.
+
+The Multi-Signer EDNS(0) option is structured as follows:
 
 ~~~
                                                1   1   1   1   1   1 
@@ -769,20 +787,22 @@ Field definition details:
 
 OPTION-CODE:
     2 octets / 16 bits (defined in {{!RFC6891}}) contains the value TBD
-    for KeyState.
+    for Multi-Signer.
 
 OPTION-LENGTH:
     2 octets / 16 bits (defined in {{!RFC6891}}) contains
     the length of the payload (everything after OPTION-LENGTH) in
-    octets and should be 3 plus the length of the EXTRA-TEXT field
+    octets and should be 4 plus the length of the OPERATION-BODY field
     (which may be zero octets long).
 
 OPERATION:
     8 bits. Signals the type of operation the message
     performs. This document defines the two operations HELLO and
     HEARTBEAT. For a complete distributed multi-signer specification a
-    number of additional operations will need to be specified, either
-    in a revision to this document or in a subsequent document.
+    number of additional operations will need to be allocated to be
+    able to describe the states in the different multi-signer
+    processes. This allocation must be done either in a revision to
+    this document or in a subsequent document.
 
 TRANSPORT:
     8 bits. Encodes the transport capabilities of the MSA. With
@@ -941,7 +961,7 @@ the Leader before initiating a new multi-signer process. Once the
 Leader has been chosen, this model is mostly equivalent to the
 original multi-signer “model 2”, with a single controller. The other
 MSAs (the followers) essentially become proxies between the controller
-(the Leader) and the signers.
+(the Leader) and the DNS Provider each MSA represents.
 
 ## Peer Mode
 
@@ -953,13 +973,30 @@ reduced to a notification mechanism (“I am now in state N”), although
 authenticated to avoid having the contents of this communication
 become an attack vector for an adversary.
 
+## Multi-Signer State Transitions
+
+For the multi-signer process semantics to be fulfilled, a new state
+transition in a multi-signer process is only possible when all signing
+DNS Providers (or their MSAs) have reached the same state.
+
+I.e. regardless of whether each MSA traverse the finite state machine
+separately, or only the Leader does, and the Followers report back
+when they have suceeded in executing the associated Actions (as
+described in {{?I-D.draft-ietf-dnsop-dnssec-automation}}, they must
+not be further apart than one transition.
+
 # Responsibilities of an MSA
 
-For a group of MSAs to be able to communicate securely and synchronize
-data for a zone, each MSA must:
+Each MSA has certain responsibilites, depending on supported
+transports and synchronization methods.
 
-* Publish the DNS records needed for secure communication with other
-  MSAs:
+## Enabling Remote MSAs to Locate This MSA
+
+For a group of MSAs to be able to communicate securely and synchronize
+data for a zone, each MSA must ensure that:
+
+* The DNS records needed for secure communication with other
+  MSAs are published:
   * URI, SVCB and KEY records required for DNS-based communication
     secured by SIG(0).
   * URI, SVCB and TLSA records required for API-based communication
@@ -967,22 +1004,37 @@ data for a zone, each MSA must:
   * All of the above MUST be published in a DNSSEC-signed zone under
     the domain name that is the identity of the MSA.
   
-* For each zone that is managed, publish the data needed for
-  synchronization with other MSAs:
+## Enabling Remote MSAs to Lookup Zone Data Added By This DNS Provider
+
+When using DNS transport between MSAs four types of information is
+needed to be conveyed from one party to another: notifications (sent
+as DNS NOTIFY), retrieval of existing data (looked up via DNS QUERY),
+changes to existing data (sent as DNS UPDATE) and, finally,
+multi-signer "state" information (sent via the Multi-Signer EDNS(0)
+OPT). For the case of looking up data for a zone that is particular to
+a specific DNS Provider (eg. the DNSKEY RRs added by that signer or
+the NS RRs representing the authoritative nameservers for that DNS
+Provider) this is looked up under domain names constructed from the
+name of the served zone and the identity of the DNS Provider.
+
+* For each zone that is managed, the data needed for
+  synchronization with other MSAs is published:
   * The DNSKEY RRset for the zone consisting of the DNSKEYS that the
-    local signer uses to sign the zone.
+    local signer for this DNS Provider uses to sign the zone.
   * The CDS RRset for the zone, representing the KSK that the local
     signer uses to sign the zone (when needed).
-  * The NS RRset for the zone, consisting of the NS records of the
-    authoritative nameserver that the local signer distributes the
-    signed zone to.
+  * The NS RRs for the zone, consisting of the NS records of the
+    authoritative nameservers that this DNS Provider is responsible
+    for.
   * All of the above MUST be published in a DNSSEC-signed zone under
     the domain name that is the concatenation of the zone name and the
     identity of the MSA. Example for the zone "zone.example" and the
     MSA "msa.provider":
 
-zone.example.msa.provider. IN DNSKEY ...
-zone.example.msa.provider. IN NS ...
+zone.example.msa.provider. IN DNSKEY ...  
+zone.example.msa.provider. IN RRSIG DNSKEY ...  
+zone.example.msa.provider. IN NS ... 
+zone.example.msa.provider. IN RRSIG NS ... 
 
 # Migration from Single-Signer to Multi-Signer
 
@@ -1027,7 +1079,7 @@ NSMGMT=AGENT.
 
 ## Migrating from a Multi-Signer Architecture Back to Single-Signer.
 
-If for some reason a zone owner wants to migrate back to a
+If, for some reason, a zone owner wants to migrate back to a
 single-signer architecture, the process is essentially the reverse of
 the migration from single-signer to multi-signer:
 
@@ -1105,6 +1157,27 @@ will be fully functional and once the MSA is able to resume its role,
 the multi-signer process will continue from where it left off.
 
 # IANA Considerations.
+
+**Note to the RFC Editor**: In this section, please replace
+occurrences of "(this document)" with a proper reference.
+
+## HSYNC RR Type
+
+IANA is requested to update the "Resource Record (RR) TYPEs" registry
+under the "Domain Name System (DNS) Parameters" registry group as
+follows:
+
+Type
+: HSYNC
+
+Value
+: TBD
+
+Meaning
+: Zone owner designation of DNS providers enabling mutual discovery
+
+Reference
+: (this document)
 
 ## New Multi-Signer EDNS Option
 
