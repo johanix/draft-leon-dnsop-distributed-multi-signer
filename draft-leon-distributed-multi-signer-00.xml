@@ -1,165 +1,111 @@
-<t><list style="symbols">
-  <t><xref target="abstract"></xref></t>
-  <t><xref target="introduction"></xref>
-  <list style="symbols">
-      <t><xref target="requirements-notation">Requirements Notation</xref></t>
-    </list></t>
-  <t><xref target="terminology"></xref></t>
-  <t><xref target="requirements"></xref></t>
-  <t><xref target="multi-signer-use-cases">Multi-Signer Use Cases</xref>
-  <list style="symbols">
-      <t><xref target="primary-use-case">Primary Use Case</xref></t>
-      <t><xref target="secondary-use-case">Secondary Use Case</xref></t>
-      <t><xref target="tertiary-use-case">Tertiary Use Case</xref></t>
-    </list></t>
-  <t><xref target="the-distributed-multi-signer-model">The Distributed Multi-Signer Model</xref>
-  <list style="symbols">
-      <t><xref target="multi-signer-agent-integrated-signer-vs-separate-agent">Multi-Signer Agent: Integrated Signer vs Separate Agent</xref></t>
-      <t><xref target="source-of-truth">Source of Truth</xref>
-      <list style="symbols">
-          <t><xref target="the-combiner">The COMBINER</xref></t>
-        </list></t>
-      <t><xref target="the-dns-provider">The DNS Provider</xref></t>
-    </list></t>
-  <t><xref target="identifying-the-designated-signers">Identifying the Designated Signers</xref></t>
-  <t><xref target="the-hsync-rrset">The HSYNC RRset</xref>
-  <list style="symbols">
-      <t><xref target="semantics-of-the-hsync-state-field">Semantics of the HSYNC State Field</xref></t>
-      <t><xref target="semantics-of-the-hsync-nsmgmt-field">Semantics of the HSYNC NSMgmt Field</xref></t>
-      <t><xref target="semantics-of-the-hsync-sign-field">Semantics of the HSYNC Sign Field</xref></t>
-    </list></t>
-  <t><xref target="communication-between-msas">Communication Between MSAs</xref>
-  <list style="symbols">
-      <t><xref target="msa-communication-via-dns">MSA Communication via DNS</xref></t>
-      <t><xref target="msa-communication-via-rest-api">MSA Communication via REST API</xref></t>
-      <t><xref target="locating-remote-multi-signer-agents">Locating Remote Multi-Signer Agents</xref>
-      <list style="symbols">
-          <t><xref target="locating-a-remote-dns-method-multi-signer-agent">Locating a Remote DNS-Method Multi-Signer Agent</xref></t>
-          <t><xref target="locating-a-remote-api-method-multi-signer-agent">Locating a Remote API-Method Multi-Signer Agent</xref>
-          <list style="symbols">
-              <t><xref target="fallback-to-dns-based-communication">Fallback to DNS-based Communication</xref></t>
-            </list></t>
-        </list></t>
-      <t><xref target="the-initial-hello-phase">The Initial HELLO Phase</xref>
-      <list style="symbols">
-          <t><xref target="dns-based-hello-phase">DNS-based HELLO Phase</xref></t>
-          <t><xref target="api-based-hello-phase">API-based HELLO Phase</xref></t>
-          <t><xref target="interpretation-of-the-hello-responses">Interpretation of the HELLO Responses</xref></t>
-        </list></t>
-      <t><xref target="multi-signer-edns0-option-format">Multi-Signer EDNS(0) Option Format</xref>
-      <list style="symbols">
-          <t><xref target="encoding-transport-capabilities-in-the-multi-signer-edns0-option">Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option</xref></t>
-          <t><xref target="encoding-synchronization-capabilities-in-the-multi-signer-edns0-option">Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option</xref></t>
-        </list></t>
-    </list></t>
-  <t><xref target="sequence-diagram-example-of-establishing-secure-comms---the-hello-phase">Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"</xref></t>
-  <t><xref target="synchronization-of-changes-between-msas">Synchronization of Changes Between MSAs</xref>
-  <list style="symbols">
-      <t><xref target="leaderfollower-mode">Leader/Follower Mode</xref></t>
-      <t><xref target="peer-mode">Peer Mode</xref></t>
-    </list></t>
-  <t><xref target="responsibilities-of-an-msa">Responsibilities of an MSA</xref></t>
-  <t><xref target="migration-from-single-signer-to-multi-signer">Migration from Single-Signer to Multi-Signer</xref>
-  <list style="symbols">
-      <t><xref target="adding-a-single-hsync-record-to-an-already-signed-zone">Adding a single HSYNC record to an already signed zone</xref></t>
-      <t><xref target="changing-the-hsync-nsmgmt-field-from-agent-to-owner">Changing the HSYNC NSMGMT Field from AGENT To OWNER</xref></t>
-      <t><xref target="migrating-from-a-multi-signer-architecture-back-to-single-signer">Migrating from a Multi-Signer Architecture Back to Single-Signer.</xref></t>
-    </list></t>
-  <t><xref target="rationale"></xref>
-  <list style="symbols">
-      <t><xref target="choice-of-the-hsync-mnemonic">Choice of the HSYNC Mnemonic</xref></t>
-      <t><xref target="separation-of-msa-and-combiner">Separation of MSA and COMBINER</xref></t>
-    </list></t>
-  <t><xref target="security-considerations">Security Considerations</xref></t>
-  <t><xref target="iana-considerations">IANA Considerations.</xref>
-  <list style="symbols">
-      <t><xref target="new-multi-signer-edns-option">New Multi-Signer EDNS Option</xref></t>
-      <t><xref target="a-new-registry-for-edns-option-multi-signer-operation-codes">A New Registry for EDNS Option Multi-Signer Operation Codes</xref></t>
-    </list></t>
-  <t>    <section anchor="change-history-to-be-removed-before-publicationchange-history-to-be-removed-before-publication"><name><xref target="change-history-to-be-removed-before-publication">Change History (to be removed before publication)</xref></name>
-  <vspace blankLines='1'/>
-title: "Distributed DNSSEC Multi-Signer Bootstrap"
-abbrev: "Distributed Multi-Signer Bootstrap"
-docname: draft-leon-distributed-multi-signer-00
-date: {DATE}
-category: std</t>
-</list></t>
+<?xml version="1.0" encoding="UTF-8"?>
+  <?xml-stylesheet type="text/xsl" href="rfc2629.xslt" ?>
+  <!-- generated by https://github.com/cabo/kramdown-rfc version 1.6.17 (Ruby 2.6.10) -->
 
-<t>ipr: trust200902
-area: Internet
-workgroup: DNSOP Working Group
-keyword: Internet-Draft</t>
 
-<t>stand_alone: yes
-pi: [toc, sortrefs, symrefs]</t>
+<!DOCTYPE rfc  [
+  <!ENTITY nbsp    "&#160;">
+  <!ENTITY zwsp   "&#8203;">
+  <!ENTITY nbhy   "&#8209;">
+  <!ENTITY wj     "&#8288;">
 
-<t>author:
- -
-    ins: L. Fernandez
-    name: Leon Fernandez
-    organization: The Swedish Internet Foundation
-    country: Sweden
-    email: leon.fernandez@internetstiftelsen.se
- -
-    ins: E. Bergström
-    name: Erik Bergström
-    organization: The Swedish Internet Foundation
-    country: Sweden
-    email: erik.bergstrom@internetstiftelsen.se
- -
-    ins: J. Stenstam
-    name: Johan Stenstam
-    organization: The Swedish Internet Foundation
-    country: Sweden
-    email: johan.stenstam@internetstiftelsen.se
- -
-    ins: S. Crocker
-    name: Steve Crocker
-    organization: Edgemoor Research Institute
-    country: United States
-    email: steve@shinkuro.com</t>
+]>
 
-<t>normative:</t>
 
-<t>informative:</t>
+<rfc ipr="trust200902" docName="draft-leon-distributed-multi-signer-00" category="std" consensus="true" tocInclude="true" sortRefs="true" symRefs="true">
+  <front>
+    <title abbrev="Distributed Multi-Signer Bootstrap">Distributed DNSSEC Multi-Signer Bootstrap</title>
 
-<t>--- abstract</t>
+    <author initials="L." surname="Fernandez" fullname="Leon Fernandez">
+      <organization>The Swedish Internet Foundation</organization>
+      <address>
+        <postal>
+          <country>Sweden</country>
+        </postal>
+        <email>leon.fernandez@internetstiftelsen.se</email>
+      </address>
+    </author>
+    <author initials="E." surname="Bergström" fullname="Erik Bergström">
+      <organization>The Swedish Internet Foundation</organization>
+      <address>
+        <postal>
+          <country>Sweden</country>
+        </postal>
+        <email>erik.bergstrom@internetstiftelsen.se</email>
+      </address>
+    </author>
+    <author initials="J." surname="Stenstam" fullname="Johan Stenstam">
+      <organization>The Swedish Internet Foundation</organization>
+      <address>
+        <postal>
+          <country>Sweden</country>
+        </postal>
+        <email>johan.stenstam@internetstiftelsen.se</email>
+      </address>
+    </author>
+    <author initials="S." surname="Crocker" fullname="Steve Crocker">
+      <organization>Edgemoor Research Institute</organization>
+      <address>
+        <postal>
+          <country>United States</country>
+        </postal>
+        <email>steve@shinkuro.com</email>
+      </address>
+    </author>
 
-</section>
+    <date />
+
+    <area>Internet</area>
+    <workgroup>DNSOP Working Group</workgroup>
+    <keyword>Internet-Draft</keyword>
+
+    <abstract>
+
+
 <section anchor="abstract"><name>Abstract</name>
 
 <t>This document presents an architecture for a distributed DNSSEC
 multi-signer model that most closely resembles "model 2" in
-<xref target="!RFC8901"/>.</t>
+<xref target="RFC8901"/>.</t>
 
 <t>It defines two multi-signer specific entities: the "multi-signer
 agent" (MSA) that is responsible for the multi-signer process and the
-"combiner", which manages combination of unsigned zone data from the
-zone owner with zone data under control of the MSA. It introduces a
-new DNS RRtype, SIGNER, that is used by the zone owner to designate
-the chosen multi-signer agents. Furthermore it describes a mechanism
-for the MSAs to establish secure communication with each other, either
-via “pure DNS” communication secured by DNS SIG(0) signatures on each
-message or via a RESTful API secured by TLS. Finally, the document
-describes two models for multi-signer process synchronization:
-“leader/follower mode” and “peer mode” and the mechanism by which a
-set of MSAs decide which model to use for a given zone.</t>
+"combiner", which is responsible for "combining" unsigned zone data
+from the zone owner with zone data under control of the MSA. It
+introduces a new DNS RRtype, HSYNC, that is used by the zone owner to
+designate the chosen DNS Providers (signing and/or serving the
+zone). Furthermore it describes a mechanism for the MSAs to establish
+secure communication with each other, either via “pure DNS”
+communication secured by DNS SIG(0) signatures on each message or via
+a RESTful API secured by TLS. Finally, the document describes two
+models for multi-signer process synchronization: “leader/follower
+mode” and “peer mode” and the mechanism by which a set of MSAs decide
+which model to use for a given zone.</t>
 
 <t>The scope of the document is only the distributed aspect of DNSSEC
 multi-signer up to the point where secure communication and
 synchronization method between MSAs has been established. The
 “multi-signer algorithms” that deal with the actual synchronization
 required for multi-signer operation are described in
-<xref target="?I-D.draft-ietf-dnsop-dnssec-automation"/>.</t>
+<xref target="I-D.draft-ietf-dnsop-dnssec-automation"/>.</t>
 
 <t>TO BE REMOVED: This document is being collaborated on in Github at:
 <eref target="https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer">https://github.com/johanix/draft-leon-dnsop-distributed-multi-signer</eref>.
 The most recent working version of the document, open issues, etc, should all be
 available there.  The authors (gratefully) accept pull requests.</t>
 
-<t>--- middle</t>
-
 </section>
+
+
+    </abstract>
+
+
+
+  </front>
+
+  <middle>
+
+
 <section anchor="introduction"><name>Introduction</name>
 
 <t>The issue of how to eliminate so-called "single points of failure"
@@ -167,25 +113,25 @@ from systems to make them more robust is a recurring theme in systems
 design and so also for DNS. In the DNS case redundancy is addressed by
 having multiple name servers for the same zone. However, when the zone
 is DNSSEC-signed there is traditionally an additional single point of
-failure: the so-called "signer".</t>
+failure: the so-called "signer" of the zone.</t>
 
-<t>Multi-signer (<xref target="!RFC8901"/>) describes a process by which it is
-possible to use more than one signer, by having the signers (or their
-agents) communicate and exchange data that should be signed by the
-other signer. The most obvious example is that each signer's
-Key-Signing Key must sign a DNSKEY RRset that contains the
-Zone-Signing Keys for all signers.</t>
+<t>In multi-signer (<xref target="RFC8901"/>) model 2, a process is described by
+which it is possible to use more than one signer (each with its own
+set of keys), by having the signers (or their agents) communicate and
+exchange data that should be signed by the other signer. The most
+obvious example is that each signer's Key-Signing Key must sign a
+DNSKEY RRset that contains the Zone-Signing Keys for all signers.</t>
 
-<t>To synchronize data between signers two models are possible: in a
-"centralized" model there is a single "controller" that decides what
-changes are needed. In a "distributed" model the signers themselves
-(or an agent of each signer)decide what changes are needed.</t>
+<t>To synchronize data between signers two models are possible: either a
+"centralized" model where a single "controller" decides what changes
+are needed, or a "distributed" model where the signers themselves (or
+an agent of each signer) decide what changes are needed.</t>
 
 <t>The first model has been implemented previously, and while it works
 from a technical point of view, it is not a good solution from a risk
 management point of view. The primary problem is that the signers have
 difficulty accepting that an external third party (the controller) has
-the ability to change the data (of a customer zone).</t>
+the ability to modify data (in a customer zone).</t>
 
 <t>This document is an attempt to address the synchronization problem by
 proposing a distributed model without a central controller.</t>
@@ -205,19 +151,20 @@ common) case of a single signer being a special case.</t>
 completely automated, distributed multi-signer model together with a
 seamless transition path from the current single-signer model to the
 multi-signer model. From the zone owners point of view, the transition
-is done through the addition of a new RRtype, SIGNER, that is used to
-designate the chosen multi-signer agents.</t>
+is done through the addition of a new RRtype, HSYNC, that is used to
+designate the chosen DNS Providers, their responsibilities and
+information to enable the DNS Providers to locate each other.</t>
 
-<t>Knowledge of DNS NOTIFY <xref target="!RFC1996"/> and DNS Dynamic Updates
-<xref target="!RFC2136"/> and <xref target="!RFC3007"/> is assumed. DNS SIG(0) transaction
-signatures are documented in <xref target="!RFC2931"/>.</t>
+<t>Knowledge of DNS NOTIFY <xref target="RFC1996"/> and DNS Dynamic Updates
+<xref target="RFC2136"/> and <xref target="RFC3007"/> is assumed. DNS SIG(0) transaction
+signatures are documented in <xref target="RFC2931"/>.</t>
 
 <section anchor="requirements-notation"><name>Requirements Notation</name>
 
 <t>The key words "<strong>MUST</strong>", "<strong>MUST NOT</strong>", "<strong>REQUIRED</strong>", "<strong>SHALL</strong>",
 "<strong>SHALL NOT</strong>", "<strong>SHOULD</strong>", "<strong>SHOULD NOT</strong>", "<strong>RECOMMENDED</strong>",
 "<strong>NOT RECOMMENDED</strong>", "<strong>MAY</strong>", and "<strong>OPTIONAL</strong>" in this document
-are to be interpreted as described in BCP 14 <xref target="!RFC2119"/> <xref target="!RFC8174"/>
+are to be interpreted as described in BCP 14 <xref target="RFC2119"/> <xref target="RFC8174"/>
 when, and only when, they appear in all capitals, as shown here.</t>
 
 </section>
@@ -238,11 +185,11 @@ be able to signal to the individual multi-signer providers
 information sufficient for the providers to identify each other and
 establish secure communication.</t>
   <t>The zone owner MUST be able to signal the intent to onboard an
-additional multi-signer provider. This must automatically initiate
-the multi-signer “add signer” process, as described in RFC nnnn.</t>
+additional multi-signer provider. This MUST automatically initiate
+the multi-signer “add signer” process, as described in <xref target="RFC8901"/>.</t>
   <t>The zone owner MUST be able to signal the intent to offboard an
 existing multi-signer provider. This MUST automatically initiate
-the multi-signer “remove signer” process, as described in RFC nnnn.</t>
+the multi-signer “remove signer” process, as described in <xref target="RFC8901"/>.</t>
   <t>All signalling from zone owner to multi-signer providers SHOULD be
 carried out via data in the served zone, to ensure that all
 providers get the same configuration information at (almost) the
@@ -252,8 +199,10 @@ owner MUST give up control over the following records:
   <list style="symbols">
       <t>All DNSSEC related records in the zone</t>
       <t>Any CDS and/or CSYNC RRsets</t>
-      <t>The NS RRset (according to the zone owner's policy)</t>
     </list></t>
+  <t>It SHOULD be possible but mandatory for the zone owner to also
+delegate the management of the NS RRset to the set of DNS
+Providers.</t>
 </list></t>
 
 </section>
@@ -561,7 +510,7 @@ being offboarded.</t>
 involves the remaining signers (hence the signalling) and it is
 important to know which signer is being offboarded so that the correct
 data may be removed in the correct order during the multi-signer
-"remove signer" process (see <xref target="!RFC8901"/>).</t>
+"remove signer" process (see <xref target="RFC8901"/>).</t>
 
 <t>Once the offboarding process is complete the HSYNC RR for the
 offboarded MSA may be removed from the zone at the zone owners
@@ -861,7 +810,7 @@ for this zone.</t>
 </section>
 <section anchor="multi-signer-edns0-option-format"><name>Multi-Signer EDNS(0) Option Format</name>
 
-<t>This document uses an Extended Mechanism for DNS (EDNS0) <xref target="!RFC6891"/>
+<t>This document uses an Extended Mechanism for DNS (EDNS0) <xref target="RFC6891"/>
 option to include Key State information in DNS messages. The option is
 structured as follows:</t>
 
@@ -884,11 +833,11 @@ structured as follows:</t>
 <t>Field definition details:</t>
 
 <t>OPTION-CODE:
-    2 octets / 16 bits (defined in <xref target="!RFC6891"/>) contains the value TBD
+    2 octets / 16 bits (defined in <xref target="RFC6891"/>) contains the value TBD
     for KeyState.</t>
 
 <t>OPTION-LENGTH:
-    2 octets / 16 bits (defined in <xref target="!RFC6891"/>) contains
+    2 octets / 16 bits (defined in <xref target="RFC6891"/>) contains
     the length of the payload (everything after OPTION-LENGTH) in
     octets and should be 3 plus the length of the EXTRA-TEXT field
     (which may be zero octets long).</t>
@@ -1268,7 +1217,7 @@ which IANA is requested to create and mainain a new registry entitled
 "Multi-Signer Operations", used by the Multi-Signer option. Initial
 values for the "Multi-Signer Operations" registry are given below;
 future assignments in in the 3-127 range are to be made through
-Specification Required review <xref target="?BCP26"/>.</t>
+Specification Required review <xref target="BCP26"/>.</t>
 
 <figure><artwork><![CDATA[
 +-----------+---------------------------------------------+-------------------+
@@ -1286,10 +1235,200 @@ Specification Required review <xref target="?BCP26"/>.</t>
 +-----------+---------------------------------------------+-------------------+
 ]]></artwork></figure>
 
-<t>--- back</t>
+</section>
+</section>
 
-</section>
-</section>
+
+  </middle>
+
+  <back>
+
+
+    <references title='Normative References'>
+
+
+
+<reference anchor='RFC8901' target='https://www.rfc-editor.org/info/rfc8901'>
+  <front>
+    <title>Multi-Signer DNSSEC Models</title>
+    <author fullname='S. Huque' initials='S.' surname='Huque'/>
+    <author fullname='P. Aras' initials='P.' surname='Aras'/>
+    <author fullname='J. Dickinson' initials='J.' surname='Dickinson'/>
+    <author fullname='J. Vcelak' initials='J.' surname='Vcelak'/>
+    <author fullname='D. Blacka' initials='D.' surname='Blacka'/>
+    <date month='September' year='2020'/>
+    <abstract>
+      <t>Many enterprises today employ the service of multiple DNS providers to distribute their authoritative DNS service. Deploying DNSSEC in such an environment may present some challenges, depending on the configuration and feature set in use. In particular, when each DNS provider independently signs zone data with their own keys, additional key-management mechanisms are necessary. This document presents deployment models that accommodate this scenario and describes these key-management requirements. These models do not require any changes to the behavior of validating resolvers, nor do they impose the new key-management requirements on authoritative servers not involved in multi-signer configurations.</t>
+    </abstract>
+  </front>
+  <seriesInfo name='RFC' value='8901'/>
+  <seriesInfo name='DOI' value='10.17487/RFC8901'/>
+</reference>
+
+<reference anchor='RFC1996' target='https://www.rfc-editor.org/info/rfc1996'>
+  <front>
+    <title>A Mechanism for Prompt Notification of Zone Changes (DNS NOTIFY)</title>
+    <author fullname='P. Vixie' initials='P.' surname='Vixie'/>
+    <date month='August' year='1996'/>
+    <abstract>
+      <t>This memo describes the NOTIFY opcode for DNS, by which a master server advises a set of slave servers that the master's data has been changed and that a query should be initiated to discover the new data. [STANDARDS-TRACK]</t>
+    </abstract>
+  </front>
+  <seriesInfo name='RFC' value='1996'/>
+  <seriesInfo name='DOI' value='10.17487/RFC1996'/>
+</reference>
+
+<reference anchor='RFC2136' target='https://www.rfc-editor.org/info/rfc2136'>
+  <front>
+    <title>Dynamic Updates in the Domain Name System (DNS UPDATE)</title>
+    <author fullname='P. Vixie' initials='P.' role='editor' surname='Vixie'/>
+    <author fullname='S. Thomson' initials='S.' surname='Thomson'/>
+    <author fullname='Y. Rekhter' initials='Y.' surname='Rekhter'/>
+    <author fullname='J. Bound' initials='J.' surname='Bound'/>
+    <date month='April' year='1997'/>
+    <abstract>
+      <t>Using this specification of the UPDATE opcode, it is possible to add or delete RRs or RRsets from a specified zone. Prerequisites are specified separately from update operations, and can specify a dependency upon either the previous existence or nonexistence of an RRset, or the existence of a single RR. [STANDARDS-TRACK]</t>
+    </abstract>
+  </front>
+  <seriesInfo name='RFC' value='2136'/>
+  <seriesInfo name='DOI' value='10.17487/RFC2136'/>
+</reference>
+
+<reference anchor='RFC3007' target='https://www.rfc-editor.org/info/rfc3007'>
+  <front>
+    <title>Secure Domain Name System (DNS) Dynamic Update</title>
+    <author fullname='B. Wellington' initials='B.' surname='Wellington'/>
+    <date month='November' year='2000'/>
+    <abstract>
+      <t>This document proposes a method for performing secure Domain Name System (DNS) dynamic updates. [STANDARDS-TRACK]</t>
+    </abstract>
+  </front>
+  <seriesInfo name='RFC' value='3007'/>
+  <seriesInfo name='DOI' value='10.17487/RFC3007'/>
+</reference>
+
+<reference anchor='RFC2931' target='https://www.rfc-editor.org/info/rfc2931'>
+  <front>
+    <title>DNS Request and Transaction Signatures ( SIG(0)s )</title>
+    <author fullname='D. Eastlake 3rd' initials='D.' surname='Eastlake 3rd'/>
+    <date month='September' year='2000'/>
+    <abstract>
+      <t>This document describes the minor but non-interoperable changes in Request and Transaction signature resource records ( SIG(0)s ) that implementation experience has deemed necessary. [STANDARDS-TRACK]</t>
+    </abstract>
+  </front>
+  <seriesInfo name='RFC' value='2931'/>
+  <seriesInfo name='DOI' value='10.17487/RFC2931'/>
+</reference>
+
+<reference anchor='RFC2119' target='https://www.rfc-editor.org/info/rfc2119'>
+  <front>
+    <title>Key words for use in RFCs to Indicate Requirement Levels</title>
+    <author fullname='S. Bradner' initials='S.' surname='Bradner'/>
+    <date month='March' year='1997'/>
+    <abstract>
+      <t>In many standards track documents several words are used to signify the requirements in the specification. These words are often capitalized. This document defines these words as they should be interpreted in IETF documents. This document specifies an Internet Best Current Practices for the Internet Community, and requests discussion and suggestions for improvements.</t>
+    </abstract>
+  </front>
+  <seriesInfo name='BCP' value='14'/>
+  <seriesInfo name='RFC' value='2119'/>
+  <seriesInfo name='DOI' value='10.17487/RFC2119'/>
+</reference>
+
+<reference anchor='RFC8174' target='https://www.rfc-editor.org/info/rfc8174'>
+  <front>
+    <title>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</title>
+    <author fullname='B. Leiba' initials='B.' surname='Leiba'/>
+    <date month='May' year='2017'/>
+    <abstract>
+      <t>RFC 2119 specifies common key words that may be used in protocol specifications. This document aims to reduce the ambiguity by clarifying that only UPPERCASE usage of the key words have the defined special meanings.</t>
+    </abstract>
+  </front>
+  <seriesInfo name='BCP' value='14'/>
+  <seriesInfo name='RFC' value='8174'/>
+  <seriesInfo name='DOI' value='10.17487/RFC8174'/>
+</reference>
+
+<reference anchor='RFC6891' target='https://www.rfc-editor.org/info/rfc6891'>
+  <front>
+    <title>Extension Mechanisms for DNS (EDNS(0))</title>
+    <author fullname='J. Damas' initials='J.' surname='Damas'/>
+    <author fullname='M. Graff' initials='M.' surname='Graff'/>
+    <author fullname='P. Vixie' initials='P.' surname='Vixie'/>
+    <date month='April' year='2013'/>
+    <abstract>
+      <t>The Domain Name System's wire protocol includes a number of fixed fields whose range has been or soon will be exhausted and does not allow requestors to advertise their capabilities to responders. This document describes backward-compatible mechanisms for allowing the protocol to grow.</t>
+      <t>This document updates the Extension Mechanisms for DNS (EDNS(0)) specification (and obsoletes RFC 2671) based on feedback from deployment experience in several implementations. It also obsoletes RFC 2673 ("Binary Labels in the Domain Name System") and adds considerations on the use of extended labels in the DNS.</t>
+    </abstract>
+  </front>
+  <seriesInfo name='STD' value='75'/>
+  <seriesInfo name='RFC' value='6891'/>
+  <seriesInfo name='DOI' value='10.17487/RFC6891'/>
+</reference>
+
+
+
+
+    </references>
+
+    <references title='Informative References'>
+
+
+
+
+<reference anchor='I-D.draft-ietf-dnsop-dnssec-automation' target='https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-dnssec-automation-03'>
+   <front>
+      <title>DNSSEC automation</title>
+      <author fullname='Ulrich Wisser' initials='U.' surname='Wisser'>
+         </author>
+      <author fullname='Shumon Huque' initials='S.' surname='Huque'>
+         <organization>Salesforce</organization>
+      </author>
+      <author fullname='Johan Stenstam' initials='J.' surname='Stenstam'>
+         <organization>The Swedish Internet Foundation</organization>
+      </author>
+      <date day='19' month='October' year='2024'/>
+      <abstract>
+	 <t>   This document describes an algorithm and protocol to automate the
+   setup, operations, and decomissioning of Multi-Signer DNSSEC
+   [RFC8901] configurations.  It employs Model 2 of the multi-signer
+   specification, where each operator has their own distinct KSK and ZSK
+   sets (or CSK sets), Managing DS Records from the Parent via CDS/
+   CDNSKEY [RFC8078], and Child-to-Parent Synchronization in DNS
+   [RFC7477] to accomplish this.
+
+	 </t>
+      </abstract>
+   </front>
+   <seriesInfo name='Internet-Draft' value='draft-ietf-dnsop-dnssec-automation-03'/>
+   
+</reference>
+
+<referencegroup anchor='BCP26' target='https://www.rfc-editor.org/info/bcp26'>
+  <reference anchor='RFC8126' target='https://www.rfc-editor.org/info/rfc8126'>
+    <front>
+      <title>Guidelines for Writing an IANA Considerations Section in RFCs</title>
+      <author fullname='M. Cotton' initials='M.' surname='Cotton'/>
+      <author fullname='B. Leiba' initials='B.' surname='Leiba'/>
+      <author fullname='T. Narten' initials='T.' surname='Narten'/>
+      <date month='June' year='2017'/>
+      <abstract>
+        <t>Many protocols make use of points of extensibility that use constants to identify various protocol parameters. To ensure that the values in these fields do not have conflicting uses and to promote interoperability, their allocations are often coordinated by a central record keeper. For IETF protocols, that role is filled by the Internet Assigned Numbers Authority (IANA).</t>
+        <t>To make assignments in a given registry prudently, guidance describing the conditions under which new values should be assigned, as well as when and how modifications to existing values can be made, is needed. This document defines a framework for the documentation of these guidelines by specification authors, in order to assure that the provided guidance for the IANA Considerations is clear and addresses the various issues that are likely in the operation of a registry.</t>
+        <t>This is the third edition of this document; it obsoletes RFC 5226.</t>
+      </abstract>
+    </front>
+    <seriesInfo name='BCP' value='26'/>
+    <seriesInfo name='RFC' value='8126'/>
+    <seriesInfo name='DOI' value='10.17487/RFC8126'/>
+  </reference>
+</referencegroup>
+
+
+
+
+    </references>
+
+
 <section anchor="change-history-to-be-removed-before-publication"><name>Change History (to be removed before publication)</name>
 
 <t><list style="symbols">
@@ -1299,4 +1438,340 @@ Specification Required review <xref target="?BCP26"/>.</t>
 <ul empty="true"><li>
   <t>Initial public draft.</t>
 </li></ul>
+
 </section>
+
+
+  </back>
+
+<!-- ##markdown-source:
+H4sIABPIpWcAA+1963Ib17Xm//0UPfCPkBYAiZKvnOPkUBJlM5ZIHZJKjpOT
+STWABtkR0I3pbpCCLaX8GlOV+TuPMC8wb+InmfWttfatu0FSsZxJnRpW5JBA
+976sve63PRqNTJM3i2w/GTzN66bKJ+smmyVPj8/ODp8kL9aLJh+d5RdFViWP
+y7KhJ9LVwKSTSZVdtd7Z9vCsnBbpkmaYVem8GS2yshjN/HujJb9X83ujBw/M
+LG3o4R+eHpwfvjNT+uOirDb7Sd3MjMlX1X7SVOu6efjgwZcPHpq0ytL95Kho
+sqrIGnNdVq8vqnK92scWTl4mv6cP8uIi+RofmtfZhp6Y+RdGT7EmY+omLWZ/
+ThdlQVNvstqs8v3kj005HSZ1WTVVNq/pt80Sv/zJmHTdXJbVvklGJqGfvKj3
+k+fj5BmNSeNk3/OnsunntN3WF2V1kRb592mTl8V+cn6ZJWfXGUHk0i0reVau
+ixk/wG9M6c8GQMCDmXyWLdN8sZ8AnOO5Hf9fcx2hbvJ5ky3qrBjXWbTOw3Hy
+OKsuCP7/538vg4UeVvnr9jcfdKUZTTCeyATl8g4r/e04OWuygs4mXOdvy8u0
+iL/4oMv8C8Yf1zr+HZZ5Nk6eVOX0dVYFq6T1XWXR5/EiD2cX2bIsq+Q0q7O0
+mmKpNEVDFBEv8FWRg7jOGiKEOlxnjRn+tb7Mi9frqhxPy6UxRVktaYKrbJ9I
+pZgHf41GoySdgCKnhO4fJQfu9/PLvE6IRtfLrGiSVUXrKZo6IRhjWTT5tFlX
+WUKDJWky6/AIE5Jvsixn2SJpLtOGfq2bZLoo62yxSTDqcrLI6mQgjzwcEPDM
+Dz/8l9NnT7748sHeu3djY46aZJbN84Iea67LJBq5XmXTfJ5PE1pd3uQZAb6h
+gx6ED5n0gr4dJDsvzg52ZRW0N5p7VRZ1TtPzLvBaNPSKTimrseUZvjQDguWE
+VlENhsn1ZU5n0zOKPkS8ZZCsCx5plnxP/CMhNEvNnFCcZ+KPymvMc503l/4R
+emtGH05LOudykZRzfpxWPk6OGjo9+nS2pnUR1IvsGtBOTk+bzSobJt+cfXf8
+ZOg2uK5p6smmPV1TmlmGhRHm8HfTSzqMgkd6WZVXOU1fJzt4AhySdn+f9lVn
+1RX+BCAw2C6xtXVFf1XLktAgxxHVU8IBXtkymxK15PXSQZY2QKdXJhlRz2RB
+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
+
+-->
+
+</rfc>
+
