@@ -140,7 +140,7 @@ The key words "**MUST**", "**MUST NOT**", "**REQUIRED**", "**SHALL**",
 are to be interpreted as described in BCP 14 {{!RFC2119}} {{!RFC8174}}
 when, and only when, they appear in all capitals, as shown here.
 
-# Terminology 
+# Terminology
 
 ...
 
@@ -391,14 +391,14 @@ entity that provides some subset of the following services:
 In addition to the above services a DNS Provider MUST also provide:
 
 * An MSA for synchronization with other DNS Providers
-* A COMBINER for the management of changes to the zone via  
+* A COMBINER for the management of changes to the zone via
   the synchronization among MSAs (if it provides a signer)
 
 I.e. in the setup above there are two DNS Providers, both of which are
 "complete" in the sense that they provide all three of the above
 services.
 
-# Identifying the Designated Signers 
+# Identifying the Designated Signers
 
 It is the responsibility of the zone owner to choose a set of "DNS
 Providers", either internal or external to the zone owners
@@ -752,7 +752,7 @@ other MSAs and can determine which synchronization model to use:
   model, the MSAs will use the Leader/Follower synchronization model
   for this zone.
 
-## Multi-Signer EDNS(0) Option Format 
+## Multi-Signer EDNS(0) Option Format
 
 This document uses an Extended Mechanism for DNS (EDNS0) {{!RFC6891}}
 option to include Multi-Signer synchronization information in DNS
@@ -768,8 +768,8 @@ therefore a new EDNS(0) option is defined here.
 The Multi-Signer EDNS(0) option is structured as follows:
 
 ~~~
-                                               1   1   1   1   1   1 
-       0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5 
+                                               1   1   1   1   1   1
+       0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  0:  |                            OPTION-CODE                        |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -778,7 +778,7 @@ The Multi-Signer EDNS(0) option is structured as follows:
  4:  |           OPERATION           |           TRANSPORT           |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  8:  |        SYNCHRONIZATION        |                               /
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+ 
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  10: / OPERATION-BODY                                                /
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 ~~~
@@ -993,32 +993,37 @@ transports and synchronization methods.
 ## Enabling Remote MSAs to Locate This MSA
 
 For a group of MSAs to be able to communicate securely and synchronize
-data for a zone, each MSA must ensure that:
+data for a zone, each MSA must ensure that the DNS records needed for
+secure communication with other MSAs are published:
 
-* The DNS records needed for secure communication with other
-  MSAs are published:
   * URI, SVCB and KEY records required for DNS-based communication
     secured by SIG(0).
   * URI, SVCB and TLSA records required for API-based communication
     secured by TLS (if supported).
   * All of the above MUST be published in a DNSSEC-signed zone under
     the domain name that is the identity of the MSA.
-  
+
 ## Enabling Remote MSAs to Lookup Zone Data Added By This DNS Provider
 
-When using DNS transport between MSAs four types of information is
-needed to be conveyed from one party to another: notifications (sent
-as DNS NOTIFY), retrieval of existing data (looked up via DNS QUERY),
-changes to existing data (sent as DNS UPDATE) and, finally,
-multi-signer "state" information (sent via the Multi-Signer EDNS(0)
-OPT). For the case of looking up data for a zone that is particular to
-a specific DNS Provider (eg. the DNSKEY RRs added by that signer or
-the NS RRs representing the authoritative nameservers for that DNS
-Provider) this is looked up under domain names constructed from the
-name of the served zone and the identity of the DNS Provider.
+When using DNS transport between MSAs, four types of information is
+needed to be conveyed from one party to another:
 
-* For each zone that is managed, the data needed for
-  synchronization with other MSAs is published:
+1. Notifications (sent as DNS NOTIFY).
+2. Retrieval of existing data (looked up via DNS QUERY).
+3. Changes to existing data (sent as DNS UPDATE).
+4. Multi-signer "state" information (sent via the Multi-Signer EDNS(0)
+   OPT).
+
+The second case, i.e. looking up data for a zone that is particular to
+a specific DNS Provider is typically about the DNSKEY RRs added by
+that signer or the NS RRs representing the authoritative nameservers
+for that DNS Provider. This is looked up under domain names
+constructed from the name of the served zone and the identity of the
+DNS Provider.
+
+For each zone that is managed, the MSA must ensure that the data
+needed for synchronization with other MSAs is published:
+
   * The DNSKEY RRset for the zone consisting of the DNSKEYS that the
     local signer for this DNS Provider uses to sign the zone.
   * The CDS RRset for the zone, representing the KSK that the local
@@ -1031,10 +1036,10 @@ name of the served zone and the identity of the DNS Provider.
     identity of the MSA. Example for the zone "zone.example" and the
     MSA "msa.provider":
 
-zone.example.msa.provider. IN DNSKEY ...  
-zone.example.msa.provider. IN RRSIG DNSKEY ...  
-zone.example.msa.provider. IN NS ... 
-zone.example.msa.provider. IN RRSIG NS ... 
+zone.example.msa.provider. IN DNSKEY ...
+zone.example.msa.provider. IN RRSIG DNSKEY ...
+zone.example.msa.provider. IN NS ...
+zone.example.msa.provider. IN RRSIG NS ...
 
 # Migration from Single-Signer to Multi-Signer
 
@@ -1159,7 +1164,7 @@ the multi-signer process will continue from where it left off.
 # IANA Considerations.
 
 **Note to the RFC Editor**: In this section, please replace
-occurrences of "(this document)" with a proper reference.
+occurrences of "(This document)" with a proper reference.
 
 ## HSYNC RR Type
 
@@ -1177,14 +1182,14 @@ Meaning
 : Zone owner designation of DNS providers enabling mutual discovery
 
 Reference
-: (this document)
+: (This document)
 
 ## New Multi-Signer EDNS Option
 
 This document defines a new EDNS(0) option, entitled "Multi-Signer",
 assigned a value of TBD "DNS EDNS0 Option Codes (OPT)" registry
 
-TO BE REMOVED UPON PUBLICATION: 
+TO BE REMOVED UPON PUBLICATION:
 [https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-11](foo)
 
 ~~~
