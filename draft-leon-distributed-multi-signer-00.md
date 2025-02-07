@@ -1,53 +1,3 @@
-- [Abstract](#abstract)
-- [Introduction](#introduction)
-  - [Requirements Notation](#requirements-notation)
-- [Terminology](#terminology)
-- [Requirements](#requirements)
-- [Multi-Signer Use Cases](#multi-signer-use-cases)
-  - [Primary Use Case](#primary-use-case)
-  - [Secondary Use Case](#secondary-use-case)
-  - [Tertiary Use Case](#tertiary-use-case)
-- [The Distributed Multi-Signer Model](#the-distributed-multi-signer-model)
-  - [Multi-Signer Agent: Integrated Signer vs Separate Agent](#multi-signer-agent-integrated-signer-vs-separate-agent)
-  - [Source of Truth](#source-of-truth)
-    - [The COMBINER](#the-combiner)
-  - [The DNS Provider](#the-dns-provider)
-- [Identifying the Designated Signers](#identifying-the-designated-signers)
-- [The HSYNC RRset](#the-hsync-rrset)
-  - [Semantics of the HSYNC State Field](#semantics-of-the-hsync-state-field)
-  - [Semantics of the HSYNC NSMgmt Field](#semantics-of-the-hsync-nsmgmt-field)
-  - [Semantics of the HSYNC Sign Field](#semantics-of-the-hsync-sign-field)
-- [Communication Between MSAs](#communication-between-msas)
-  - [MSA Communication via DNS](#msa-communication-via-dns)
-  - [MSA Communication via REST API](#msa-communication-via-rest-api)
-  - [Locating Remote Multi-Signer Agents](#locating-remote-multi-signer-agents)
-    - [Locating a Remote DNS-Method Multi-Signer Agent](#locating-a-remote-dns-method-multi-signer-agent)
-    - [Locating a Remote API-Method Multi-Signer Agent](#locating-a-remote-api-method-multi-signer-agent)
-      - [Fallback to DNS-based Communication](#fallback-to-dns-based-communication)
-  - [The Initial HELLO Phase](#the-initial-hello-phase)
-    - [DNS-based HELLO Phase](#dns-based-hello-phase)
-    - [API-based HELLO Phase](#api-based-hello-phase)
-    - [Interpretation of the HELLO Responses](#interpretation-of-the-hello-responses)
-  - [Multi-Signer EDNS(0) Option Format](#multi-signer-edns0-option-format)
-    - [Encoding Transport Capabilities in the Multi-Signer EDNS(0) Option](#encoding-transport-capabilities-in-the-multi-signer-edns0-option)
-    - [Encoding Synchronization Capabilities in the Multi-Signer EDNS(0) Option](#encoding-synchronization-capabilities-in-the-multi-signer-edns0-option)
-- [Sequence Diagram Example of Establishing Secure Comms - "The Hello Phase"](#sequence-diagram-example-of-establishing-secure-comms---the-hello-phase)
-- [Synchronization of Changes Between MSAs](#synchronization-of-changes-between-msas)
-  - [Leader/Follower Mode](#leaderfollower-mode)
-  - [Peer Mode](#peer-mode)
-- [Responsibilities of an MSA](#responsibilities-of-an-msa)
-- [Migration from Single-Signer to Multi-Signer](#migration-from-single-signer-to-multi-signer)
-  - [Adding a single HSYNC record to an already signed zone](#adding-a-single-hsync-record-to-an-already-signed-zone)
-  - [Changing the HSYNC NSMGMT Field from AGENT To OWNER](#changing-the-hsync-nsmgmt-field-from-agent-to-owner)
-  - [Migrating from a Multi-Signer Architecture Back to Single-Signer.](#migrating-from-a-multi-signer-architecture-back-to-single-signer)
-- [Rationale](#rationale)
-  - [Choice of the HSYNC Mnemonic](#choice-of-the-hsync-mnemonic)
-  - [Separation of MSA and COMBINER](#separation-of-msa-and-combiner)
-- [Security Considerations](#security-considerations)
-- [IANA Considerations.](#iana-considerations)
-  - [New Multi-Signer EDNS Option](#new-multi-signer-edns-option)
-  - [A New Registry for EDNS Option Multi-Signer Operation Codes](#a-new-registry-for-edns-option-multi-signer-operation-codes)
-- [Change History (to be removed before publication)](#change-history-to-be-removed-before-publication)
 ---
 title: "Distributed DNSSEC Multi-Signer Bootstrap"
 abbrev: "Distributed Multi-Signer Bootstrap"
@@ -103,16 +53,17 @@ multi-signer model that most closely resembles "model 2" in
 
 It defines two multi-signer specific entities: the "multi-signer
 agent" (MSA) that is responsible for the multi-signer process and the
-"combiner", which manages combination of unsigned zone data from the
-zone owner with zone data under control of the MSA. It introduces a
-new DNS RRtype, SIGNER, that is used by the zone owner to designate
-the chosen multi-signer agents. Furthermore it describes a mechanism
-for the MSAs to establish secure communication with each other, either
-via “pure DNS” communication secured by DNS SIG(0) signatures on each
-message or via a RESTful API secured by TLS. Finally, the document
-describes two models for multi-signer process synchronization:
-“leader/follower mode” and “peer mode” and the mechanism by which a
-set of MSAs decide which model to use for a given zone.
+"combiner", which is responsible for "combining" unsigned zone data
+from the zone owner with zone data under control of the MSA. It
+introduces a new DNS RRtype, HSYNC, that is used by the zone owner to
+designate the chosen DNS Providers (signing and/or serving the
+zone). Furthermore it describes a mechanism for the MSAs to establish
+secure communication with each other, either via “pure DNS”
+communication secured by DNS SIG(0) signatures on each message or via
+a RESTful API secured by TLS. Finally, the document describes two
+models for multi-signer process synchronization: “leader/follower
+mode” and “peer mode” and the mechanism by which a set of MSAs decide
+which model to use for a given zone.
 
 The scope of the document is only the distributed aspect of DNSSEC
 multi-signer up to the point where secure communication and
@@ -135,25 +86,25 @@ from systems to make them more robust is a recurring theme in systems
 design and so also for DNS. In the DNS case redundancy is addressed by
 having multiple name servers for the same zone. However, when the zone
 is DNSSEC-signed there is traditionally an additional single point of
-failure: the so-called "signer".
+failure: the so-called "signer" of the zone.
 
-Multi-signer ({{!RFC8901}}) describes a process by which it is
-possible to use more than one signer, by having the signers (or their
-agents) communicate and exchange data that should be signed by the
-other signer. The most obvious example is that each signer's
-Key-Signing Key must sign a DNSKEY RRset that contains the
-Zone-Signing Keys for all signers.
+In multi-signer ({{!RFC8901}}) model 2, a process is described by
+which it is possible to use more than one signer (each with its own
+set of keys), by having the signers (or their agents) communicate and
+exchange data that should be signed by the other signer. The most
+obvious example is that each signer's Key-Signing Key must sign a
+DNSKEY RRset that contains the Zone-Signing Keys for all signers.
 
-To synchronize data between signers two models are possible: in a
-"centralized" model there is a single "controller" that decides what
-changes are needed. In a "distributed" model the signers themselves
-(or an agent of each signer)decide what changes are needed.
+To synchronize data between signers two models are possible: either a
+"centralized" model where a single "controller" decides what changes
+are needed, or a "distributed" model where the signers themselves (or
+an agent of each signer) decide what changes are needed.
 
 The first model has been implemented previously, and while it works
 from a technical point of view, it is not a good solution from a risk
 management point of view. The primary problem is that the signers have
 difficulty accepting that an external third party (the controller) has
-the ability to change the data (of a customer zone).
+the ability to modify data (in a customer zone).
 
 This document is an attempt to address the synchronization problem by
 proposing a distributed model without a central controller.
@@ -173,8 +124,9 @@ From that point of view, this document proposes an architecture for a
 completely automated, distributed multi-signer model together with a
 seamless transition path from the current single-signer model to the
 multi-signer model. From the zone owners point of view, the transition
-is done through the addition of a new RRtype, SIGNER, that is used to
-designate the chosen multi-signer agents.
+is done through the addition of a new RRtype, HSYNC, that is used to
+designate the chosen DNS Providers, their responsibilities and
+information to enable the DNS Providers to locate each other.
 
 Knowledge of DNS NOTIFY {{!RFC1996}} and DNS Dynamic Updates
 {{!RFC2136}} and {{!RFC3007}} is assumed. DNS SIG(0) transaction
@@ -202,11 +154,11 @@ defined as follows:
    information sufficient for the providers to identify each other and
    establish secure communication.
  * The zone owner MUST be able to signal the intent to onboard an
-   additional multi-signer provider. This must automatically initiate
-   the multi-signer “add signer” process, as described in RFC nnnn.
+   additional multi-signer provider. This MUST automatically initiate
+   the multi-signer “add signer” process, as described in {{!RFC8901}}.
  * The zone owner MUST be able to signal the intent to offboard an
    existing multi-signer provider. This MUST automatically initiate
-   the multi-signer “remove signer” process, as described in RFC nnnn.
+   the multi-signer “remove signer” process, as described in {{!RFC8901}}.
  * All signalling from zone owner to multi-signer providers SHOULD be
    carried out via data in the served zone, to ensure that all
    providers get the same configuration information at (almost) the
@@ -215,7 +167,9 @@ defined as follows:
    owner MUST give up control over the following records:
    * All DNSSEC related records in the zone
    * Any CDS and/or CSYNC RRsets
-   * The NS RRset (according to the zone owner's policy)
+ * It SHOULD be possible but mandatory for the zone owner to also
+   delegate the management of the NS RRset to the set of DNS
+   Providers.
 
 # Multi-Signer Use Cases
 
