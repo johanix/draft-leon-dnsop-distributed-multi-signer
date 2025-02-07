@@ -553,7 +553,7 @@ information about the current state between MSAs in an ongoing
 multi-signer process. For this reason a dedicated EDNS(0) opcode
 specifically for multi-signer synchronization is proposed.
 
-This model is based on {{!draft-berra-dnsop-keystate}} that solves
+This model is based on {{?I-D.draft-berra-dnsop-keystate}} that solves
 a similar problem for delegation synchronization between child and
 parent, which has already been implemented and shown to work.
 
@@ -759,7 +759,7 @@ option to include Multi-Signer synchronization information in DNS
 messages.
 
 This option is structured the same way as the KeyState option
-described in {{?draft-berra-dnsop-keystate}}, which has been
+described in {{?I-D.draft-berra-dnsop-keystate}}, which has been
 implemented and shown to work for a similar use case. The requirements
 for multi-signer synchronization are sufficiently different that it is
 not possible to re-use the KeyState OPT also for this purpose and
