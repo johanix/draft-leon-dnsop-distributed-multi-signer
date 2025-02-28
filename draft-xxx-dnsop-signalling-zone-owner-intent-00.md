@@ -1,7 +1,7 @@
 ---
-title: "Distributed DNSSEC Multi-Signer Bootstrap"
-abbrev: "Distributed Multi-Signer Bootstrap"
-docname: draft-leon-distributed-multi-signer-00
+title: "Signalling Zone Owner Intent"
+abbrev: "Signalling Zone Owner Intent"
+docname: draft-leon-dnsop-signalling-zone-owner-intent-00
 date: {DATE}
 category: std
 
@@ -56,17 +56,17 @@ from the zone owner with zone data under control of the MSA. It
 introduces a new DNS RRtype, HSYNC, that is used by the zone owner to
 designate the chosen DNS Providers (signing and/or serving the
 zone). Furthermore it describes a mechanism for the MSAs to establish
-secure communication with each other, either via “pure DNS”
+secure communication with each other, either via "pure DNS"
 communication secured by DNS SIG(0) signatures on each message or via
 a RESTful API secured by TLS. Finally, the document describes two
-models for multi-signer process synchronization: “leader/follower
-mode” and “peer mode” and the mechanism by which a set of MSAs decide
+models for multi-signer process synchronization: "leader/follower
+mode" and "peer mode" and the mechanism by which a set of MSAs decide
 which model to use for a given zone.
 
 The scope of the document is only the distributed aspect of DNSSEC
 multi-signer up to the point where secure communication and
 synchronization method between MSAs has been established. The
-“multi-signer algorithms” that deal with the actual synchronization
+"multi-signer algorithms" that deal with the actual synchronization
 required for multi-signer operation are described in
 {{?I-D.draft-ietf-dnsop-dnssec-automation}}.
 
@@ -79,24 +79,39 @@ available there.  The authors (gratefully) accept pull requests.
 
 # Introduction
 
-The issue of how to eliminate so-called "single points of failure"
-from systems to make them more robust is a recurring theme in systems
-design and so also for DNS. In the DNS case redundancy is addressed by
-having multiple name servers for the same zone. However, when the zone
-is DNSSEC-signed there is traditionally an additional single point of
-failure: the so-called "signer" of the zone.
+DNS zone owners often need to work with multiple DNS providers to serve their zones. These providers may have different responsibilities - some may sign the zone, some may only serve it, and some may do both. Traditionally, the configuration of these providers and their responsibilities has been handled through manual processes and provider-specific mechanisms.
 
-In multi-signer ({{!RFC8901}}) model 2, a process is described by
-which it is possible to use more than one signer (each with its own
-set of keys), by having the signers (or their agents) communicate and
-exchange data that should be signed by the other signer. The most
-obvious example is that each signer's Key-Signing Key must sign a
-DNSKEY RRset that contains the Zone-Signing Keys for all signers.
+This document presents a standardized mechanism for zone owners to signal their intent regarding DNS provider responsibilities through DNS itself. It defines a new DNS RRtype, HSYNC, that allows zone owners to:
 
-To synchronize data between signers two models are possible: either a
-"centralized" model where a single "controller" decides what changes
-are needed, or a "distributed" model where the signers themselves (or
-an agent of each signer) decide what changes are needed.
+* Designate which providers are authorized to serve the zone
+* Specify whether each provider should sign the zone
+* Control whether providers or the zone owner manages the NS RRset
+* Specify on a provider-level how the zone transfer chain should be setup
+* Enable providers to discover each other and establish secure communication
+
+By publishing this information in the DNS, zone owners ensure all providers receive consistent configuration information. This enables automated coordination between providers for tasks like:
+
+* NS RRset management across multiple providers
+* Addition or removal of providers
+* Transition between different signing configurations
+* Management of DNSSEC-related records when multiple signers are used
+* Zone transfer chain configuration
+
+## Example Scenarios
+
+Consider these common scenarios where zone owners need to coordinate multiple providers:
+
+1. A zone owner uses two providers - one signs and serves the zone, while another only serves it. The providers need to coordinate NS record management.
+
+2. A zone owner wants to delegate NS RRset management to their providers while retaining control of other zone data.
+
+3. A zone owner wants to transition from one signing provider to another without service interruption.
+
+4. A zone owner implements a multi-signer DNSSEC architecture where multiple providers independently sign the zone.
+
+This document defines how zone owners can use HSYNC records to express their intent in these and similar scenarios, enabling providers to automatically coordinate their actions through their Multi-Signer Agents (MSAs).
+
+# Requirements
 
 The first model has been implemented previously, and while it works
 from a technical point of view, it is not a good solution from a risk
@@ -153,10 +168,10 @@ defined as follows:
    establish secure communication.
  * The zone owner MUST be able to signal the intent to onboard an
    additional multi-signer provider. This MUST automatically initiate
-   the multi-signer “add signer” process, as described in {{!RFC8901}}.
+   the multi-signer "add signer" process, as described in {{!RFC8901}}.
  * The zone owner MUST be able to signal the intent to offboard an
    existing multi-signer provider. This MUST automatically initiate
-   the multi-signer “remove signer” process, as described in {{!RFC8901}}.
+   the multi-signer "remove signer" process, as described in {{!RFC8901}}.
  * All signalling from zone owner to multi-signer providers SHOULD be
    carried out via data in the served zone, to ensure that all
    providers get the same configuration information at (almost) the
@@ -176,7 +191,7 @@ defined as follows:
 The primary use case for the proposed multi-signer architecture is the
 following scenario: A zone owner needs to remove the single point of
 failure that the DNSSEC signer constitutes. For this reason it
-contracts with two or more “multi-signer capable” DNS providers.
+contracts with two or more "multi-signer capable" DNS providers.
 Each such DNS provider provides the following service:
 
  * Receive the unsigned zone via zone transfer.
@@ -206,7 +221,7 @@ process is automatically initiated.
 
 Once the onboarding operation is completed the zone owner may trigger
 the pending removal of another DNS provider by changing the HSYNC
-State flag for the outgoing DNS Provider to “OFF”. This informs all
+State flag for the outgoing DNS Provider to "OFF". This informs all
 the present DNS providers about the pending removal and the
 offboarding process is automatically initiated.
 
@@ -222,17 +237,17 @@ HSYNC records.
 # The Distributed Multi-Signer Model
 
 The primary difference between monolithic and distributed multi-signer
-is that the former has a central “controller” while the latter
-doesn’t. But there is still an absolute need for synchronization
+is that the former has a central "controller" while the latter
+doesn't. But there is still an absolute need for synchronization
 between the different participants in the distributed multi-signer
 setup.
 
 There are three immediate aspects for the design of a distributed
 multi-signer architecture:
 
- * The first is “transport”: how to communicate between the
+ * The first is "transport": how to communicate between the
    individual instances in a multi-signer system.
- * The second is “synchronization”: who decides what changes are
+ * The second is "synchronization": who decides what changes are
    needed where.
  * The third is source of truth for different types of zone data. The
    zone owner is the source of truth for all unsigned zone data,
@@ -242,125 +257,124 @@ multi-signer architecture:
    the option of moving that responsibility to the DNS Providers would
    be an important improvement.
 
-## Multi-Signer Agent: Integrated Signer vs Separate Agent
+## The Agent: Integrated Signer vs Separate Agent (johani: omskriven 20250228)
 
 In a distributed setup there must be a service located with each
-multi-signer DNS Provider that manages communication with other DNS
-Providers. This is referred to as the multi-signer agent, or MSA. As
-not every DNS Provider needs to be signing the zone, the term is not
-entirely perfect, but sufficient.
+DNS Provider that manages communication with other DNS
+Providers. This is referred to as the Agent.
 
 It is possible to implement support for the synchronization and
-communication needs directly into each “signer” (i.e. typically an
+communication needs directly into each "Signer" (i.e. typically an
 authoritative nameserver with the ability to do online DNSSEC
-signing). In this case the signer implements the MSA functionality.
+signing). In this case the Signer implements the Agent functionality.
 
-However, it is also possible to separate the multi-signer
-functionality into a separate agent. This agent sits next to the
-signer, and is under the same administrative control (the "DNS
+However, it is also possible to separate the synchronization and
+communication needs into a separate agent. This Agent sits next to the
+Signer, and is under the same administrative control (the "DNS
 Provider"), but is a separate piece of software. When using this
-design each signer has an MSA attached next to it. Each MSA is
-configured as a “secondary nameserver” to a signer and receives the
-(signed) zone from this signer.
+design each Signer has an Agent attached next to it. Each Agent is
+configured as a "secondary nameserver" to a Signer and receives the
+(signed) zone from this Signer.
 
-The “separate MSA” design has the major advantage of leaving the
-signer almost entirely out of the multi-signer complexity. The
-requirements are only that the “signer” treats the MSA as a normal
+The "separate Agent" design has the major advantage of leaving the
+Signer entirely out of the synchronization and communication complexity. The
+requirements are only that the Signer treats the Agent as a normal
 secondary (sends NOTIFY messages and responds to zone transfer
-requests) and that the MSA has a mechanism that allows it to make
-changes to zones upstream of the “signer” to satisfy the multi-signer
-requirements for synchronization of certain RRsets in the apex of the
-zone.
+requests) and that the Agent has a mechanism that allows it to make
+changes to zones upstream of the Signer to satisfy the synchronization
+requirements for certain RRsets in the apex of the zone.
 
-In this document the design using a separate MSA is used, while
+In this document the design using a separate Agent is used, while
 pointing out that it is possible to integrate this into a future
-“signer” that implements both DNSSEC signing and the MSA
+"Signer" that implements both DNSSEC signing and the Agent
 functionality.
 
-## Source of Truth
+## Source of Truth (johani: omskriven 20250228)
 
 A common design for DNSSEC signing (regardless of multi-signer) is to
-use a separate, bump-on-the-wire signer. This is a signer that
+use a separate, bump-on-the-wire Signer. This is a Signer that
 receives the unsigned zone via an incoming zone transfer, signs the
 zone, and publishes the signed zone via an outbound zone transfer. In
-such a design the source of truth has been split up between the “zone
-owner” (source of truth for all non-DNSSEC zone data), and the signer
+such a design the source of truth has been split up between the "zone
+owner" (source of truth for all non-DNSSEC zone data), and the Signer
 (source of truth for all DNSSEC data in the zone).
 
-In a distributed multi-signer architecture the source of truth is
-further split up into three participants:
+In the proposed architecture the source of truth is further split up
+into three participants:
 
  * The zone owner is the source of truth for all unsigned zone data,
    except DNSSEC data and possibly the NS RRset.
- * The signer is the source of truth for all data generated via DNSSEC
+ * The Signer is the source of truth for all data generated via DNSSEC
    signing: own DNSKEYs, NSEC/NSEC3 RRs, RRSIGs, etc.
- * The MSA is the source of truth for the RRsets that must be kept in
-   sync across all the signers for the zone. This includes the DNSKEYs
-   from other signers, CDS and CSYNC RRsets. Possibly also the NS RRset.
+ * The Agent is the source of truth for the RRsets that must be kept in
+   sync across all the Signers for the zone. This includes the DNSKEYs
+   from other Signers, CDS and CSYNC RRsets. Possibly also the NS RRset.
 
 The NS RRset is an interesting special case. Traditionally the NS
 RRset is maintained by the zone owner, but based on data from the DNS
 providers (as authoritative nameservers is a primary service for the
-DNS provider). However, in a distributed multi-signer architecture the
-NS RRset should preferably be maintained by the MSA. For this reason
+DNS provider). However, in the proposed architecture the
+NS RRset should preferably be maintained by the Agents. For this reason
 the proposed design makes control of the NS RRset explicit and the
 responsibility of the zone owner to choose whether to retain control
-or delegate to the MSAs. Hence:
+or delegate to the Agents. Hence:
 
- * The MSA is the source of truth for the NS RRset, subject to the
+ * The Agent is the source of truth for the NS RRset, subject to the
    policy of the zone owner, as described in the HSYNC RRset.
 
 Making the control of the NS RRset explicit is useful regardless of
-whether a zone uses multiple signers or single signer.
+whether a zone uses multiple signers or single signer, as this makes
+the zone owner intent explicit.
 
-To be able to keep the signer as simple as possible, the changes to the
+To be able to keep the Signer as simple as possible, the changes to the
 NS, DNSKEY, CDS and CSYNC RRsets must be introduced into the unsigned
-zone before the zone reaches the signer. Likewise, to keep the zone
+zone before the zone reaches the Signer. Likewise, to keep the zone
 owner as simple as possible (i.e. not involved in the details of the
 multi-signer automation) these changes must be introduced into the
 unsigned zone after the zone leaves the zone owner.
 
-### The COMBINER
+### The Combiner (johani: omskriven 20250228)
 
 The consequence of these requirements is that the DNSKEY, CDS and
 CSYNC RRsets (and possibly the NS RRset) are maintained via a separate
-piece of software inserted between the zone owner and the signer. This
-is referred to as the multi-signer COMBINER.
+piece of software inserted between the zone owner and the Signer. This
+is referred to as the Combiner.
 
-The COMBINER has the following features:
+The Combiner has the following features:
 
  * It supports inbound zone transfer of the unsigned zone from the
    zone owner.
  * It receives updates for the NS, DNSKEY, CDS and CSYNC
-   RRsets from the MSA. Typically the mechanism used is DNS UPDATE
+   RRsets from the Agent. Typically the mechanism used is DNS UPDATE
    with a TSIG signature, as this is easy to configure in a local
    context. However, other mechanisms, including APIs, are possible.
- * It stores all data received from the MSA separate from
+ * It stores all data received from the Agent separate from
    the zone data received from the zone owner.
  * Whenever it receives a new unsigned zone from the zone owner it
    COMBINES zone data from the zone owner (the majority of the zone)
-   with specific zone data under control of the MSA: three specific
+   with specific zone data under control of the Agent: three specific
    RRsets, all in the apex of the zone: the DNSKEY,CDS and CSYNC
    RRsets.
- * It is policy free. I.e. the COMBINER is not making any judgement
+ * It is policy free (apart from being limited to the four specified
+   RRsets). I.e. the Combiner is not making any judgement
    about what data to include in the zone from the four defined
-   RRsets.  That judgement is the role of the MSA.
+   RRsets.  That judgement is the role of the Agent.
  * It does not sign the zone.
  * It provides outbound zone transfer of the combined zone to the
-   signer.
+   Signer.
 
 Example setup with two signers showing the logical flow of zone data
-between the zone owner, the COMBINER, the signer and the MSA:
+between the zone owner, the Combiner, the Signer and the Agent:
 
 ~~~
                             +--------------+
                             |     owner    |
                xfr          +-+---------+--+    xfr
-            /----------------/           \--------------------\
-           /                                                   \
-    +-----+----+    DNS  +-----+  DNS/API  +-----+  DNS    +----+-----+
-    | combiner +<--------+ msa +-----------+ msa +-------->+ combiner |
-    +-----+----+  UPDATE +--+--+           +--+--+ UPDATE  +----+-----+
+            /----------------/           \----------------------\
+           /                                                     \
+    +-----+----+    DNS  +-------+ DNS/API +-------+  DNS    +----+-----+
+    | combiner +<--------+ agent +---------+ agent +-------->+ combiner |
+    +-----+----+  UPDATE +--+----+         +--+----+ UPDATE  +----+-----+
           |                 ^                 ^                 |
           v xfr             |                 |                 v xfr
     +-----+----+     xfr    |                 |   xfr      +----+-----+
@@ -375,7 +389,7 @@ between the zone owner, the COMBINER, the signer and the MSA:
              +-----+                                              +---+
 ~~~
 
-## The DNS Provider
+## The DNS Provider (johani: omskriven 20250228)
 
 A "DNS Provider" is a term that is most commonly used to refer to an
 entity that provides authoritative DNS service to one or more zone
@@ -388,15 +402,15 @@ entity that provides some subset of the following services:
 
 In addition to the above services a DNS Provider MUST also provide:
 
-* An MSA for synchronization with other DNS Providers
-* A COMBINER for the management of changes to the zone via
-  the synchronization among MSAs (if it provides a signer)
+* An Agent for synchronization with other DNS Providers
+* A Combiner for the management of changes to the zone via
+  the synchronization among Agents (if it provides a signer)
 
 I.e. in the setup above there are two DNS Providers, both of which are
 "complete" in the sense that they provide all three of the above
 services.
 
-# Identifying the Designated Signers
+# Identifying the Designated Signers (johani: omskriven 20250228)
 
 It is the responsibility of the zone owner to choose a set of "DNS
 Providers", either internal or external to the zone owners
@@ -409,26 +423,26 @@ unsigned, zone that the zone owner maintains so that this RRset is
 visible to the downstream DNS Providers and their multi-signer agents.
 
 
-# The HSYNC RRset
+# The HSYNC RRset (johani: omskriven 20250228)
 
 The HSYNC RR has the zone name that publishes the HSYNC RRset as the
 owner name (i.e. the HSYNC RRset must be located at the apex of the
-zone). The RDATA consists of four fields "State","NSMgmt", "Sign" and
-"Identity":
+zone). The RDATA consists of five fields "State","NSMgmt", "Sign" and
+"Identity" and "Upstream":
 
-zone.example.    IN HSYNC  State  NSMgmt  Sign  Identity.
+zone.example.    IN HSYNC  State  NSMgmt  Sign  Identity  Upstream
 
 State:
     Unsigned 8-bit. Defined values are 1=ON and 2=OFF. The value 0
     is an error.  Values 3-127 are presently undefined. Values 128-255
     are reserved for private use. The presentation format allows
-    either as integers (1 or 2) or as tokens (“ON” or “OFF”).
+    either as integers (1 or 2) or as tokens ("ON" or "OFF").
 
 NSMgmt:
     Unsigned 8-bit. Defined values are 1=Zone owner and 2=MSA. The
     value 0 is an error. Values 3-255 are presently undefined (and not
     expected to be defined). The presentation format allows either as
-    integers (1 or 2) or as tokens (“OWNER” or “AGENT”).
+    integers (1 or 2) or as tokens ("OWNER" or "AGENT").
 
 Sign:
     Unsigned 8-bit. Defined values are 1=YES and 2=NO. The value 0 is an
@@ -439,46 +453,52 @@ Identity:
     Domain name. Used to uniquely identify the Multi-Signer
     Agent for the DNS Provider that the MSA represents.
 
+Upstream:
+    Domain name. Used to uniquely identify the upstream DNS Provider
+    that this DNS Provider is a downstream of. The special case of "."
+    is used to signal that this DNS Provider either has no upstream
+    (is the zone owner), or that the upstream is configured manually.
+
 Example:
 
 zone.example.   IN HSYNC  ON  AGENT  YES  msa.provider.example.
 
-## Semantics of the HSYNC State Field
+## Semantics of the HSYNC State Field (johani: omskriven 20250228)
 
-The HSYNC State field is used to signal to all MSAs what the status of
-each MSA is from the point-of-view of the zone owner. The two possible
-values are "ON" and "OFF" where "ON" means that the MSA is a currently
-designated signer for the zone and "OFF" means that the MSA is
-previously designated signer for the zone that is in the process of
-being offboarded.
+The HSYNC State field is used to signal to all Agents what the status of
+each DNS Provider is from the point-of-view of the zone owner. The two
+possible values are "ON" and "OFF" where "ON" means that the DNS Provider
+is a currently a designated DNS Provider for the zone and "OFF" means that the
+DNS Provider is previously a designated DNS Provider for the zone that is in
+the process of being offboarded.
 
 The reason for the "OFF" state is that the offboarding process
-involves the remaining signers (hence the signalling) and it is
-important to know which signer is being offboarded so that the correct
-data may be removed in the correct order during the multi-signer
+involves the remaining DNS Providers (hence the signalling) and it is
+important to know which DNS Provider is being offboarded so that the
+correct data may be removed in the correct order during the multi-signer
 "remove signer" process (see {{!RFC8901}}).
 
 Once the offboarding process is complete the HSYNC RR for the
-offboarded MSA may be removed from the zone at the zone owners
+offboarded DNS Provider may be removed from the zone at the zone owners
 discretion.
 
-## Semantics of the HSYNC NSMgmt Field
+## Semantics of the HSYNC NSMgmt Field (johani: omskriven 20250228)
 
-The NSMgmt field is used to signal to the MSAs who is responsible for
+The NSMgmt field is used to signal to the Agents who is responsible for
 the contents of the NS RRset for the zone. The two possible values are
 "OWNER" and "AGENT".
 
 The value "OWNER" signals that the zone owner is responsible for the NS
 RRset and is responsible for updating the NS RRset (either with or
-without the unified data from all MSAs). In this case the MSAs MUST NOT
-instruct the COMBINER to update the NS RRset.
+without the unified data from all Agents). In this case the Agents MUST NOT
+instruct the Combiner to update the NS RRset.
 
-The value "AGENT" means that the MSAs representing DNS Providers that
+The value "AGENT" means that the Agents representing DNS Providers that
 sign the zone are responsible for the contents of the NS RRset. In
-this case the these MSAs MUST instruct the COMBINER to update the NS
-RRset with the unified NS RRset data from all MSAs.
+this case the these Agents MUST instruct the local Combiner to update the NS
+RRset with the unified NS RRset data from all Agents.
 
-### Limitation of Scope for NS Management
+### Limitation of Scope for NS Management (johani: omskriven 20250228)
 
 For the purpose of this document the NSMgmt Field only covers the NS
 RRset. I.e. it does not include the address records of in-bailiwick
@@ -495,20 +515,22 @@ document does not.
 
 ## Semantics of the HSYNC Sign Field
 
-The Sign field is used to signal to all MSAs whether the zone owner
-requests that the DNS Provider that the MSA represents should sign the
-zone or not. The two possible values are "YES" and "NO" where "YES"
-means that the MSA represents a currently designated signer for the
-zone and "NO" means that the MSA does not.
+The Sign field is used to signal to all Agents whether the zone owner
+requests that the DNS Provider that the Agent represents should sign the
+zone or not. The two possible values are "SIGN" and "NOSIGN" where "SIGN"
+means that the Agent represents a currently designated DNS Provider for the
+zone and "NOSIGN" means that the Agent does not.
 
-When Sign=NO the MSA MUST still participate in the communication
-between MSAs for the zone, but MUST NOT instruct the COMBINER to
+When Sign=NOSIGN the Agent MUST still participate in the communication
+between Agents for the zone, but MUST NOT instruct the Combiner to
 update the NS RRset.
 
-# Communication Between MSAs
+XXX: johani: unless the zone is unsigned?
 
-For the communication between MSAs there are two choices that need to
-be made among the designated MSAs for a zone. The first is what
+# Communication Between Agents
+
+For the communication between Agents there are two choices that need to
+be made among the designated Agents for a zone. The first is what
 "transport" to use for the communication. The second is what
 "synchronization" model to use when executing future multi-signer
 processes.
@@ -521,9 +543,9 @@ The two defined transport alternatives are:
 Each has pros and cons and at this point in time it is not clear that
 one always is better than the other. To simplify the choice of
 transport DNS-based communication is mandatory to support and the REST
-API-based communication may only be used if all MSAs support
-it. Supported transports are signaled in the Multi-Signer EDNS(0)
-Option (see section NNN below).
+API-based communication may only be used if all Agents support
+it. Supported transports are signaled in the Provider-Synchronization
+EDNS(0) Option (see section NNN below).
 
 The two defined synchronization alternatives are:
 
@@ -531,23 +553,23 @@ The two defined synchronization alternatives are:
 * Peer-to-Peer synchronization
 
 Just as for transport, supported synchronization models are signaled
-in the Multi-Signer EDNS(0) Option (see section NNN below).
+in the Provider-Synchronization EDNS(0) Option (see section NNN below).
 
 Regardless of the synchronization model and communication method used,
-the MSAs SHOULD exchange all needed information about the zone and the
+the Agents SHOULD exchange all needed information about the zone and the
 DNS Provider they represent to enable the multi-signer processes to
 execute correctly. This includes notifications about changes to
 DNSKEYs, changes to the NS RRset, etc. Depending on synchronization
 model it may also include instructions for changes to the zone.
 
-## MSA Communication via DNS
+## Agent Communication via DNS (johani: omskriven 20250228)
 
 This transport alternative is based on the observation that all the
-communication needs between MSAs can be expressed via DNS
+communication needs between Agents can be expressed via DNS
 messages. Notifications are sent as DNS NOTIFY messages. Requests for
 changes to a zone are sent as DNS UPDATE messages, etc. The sole
 remaining communication requirement is for how to communicate
-information about the current state between MSAs in an ongoing
+information about the current state between Agents in an ongoing
 multi-signer process. For this reason a dedicated EDNS(0) opcode
 specifically for multi-signer synchronization is proposed.
 
@@ -555,42 +577,42 @@ This model is based on {{?I-D.draft-berra-dnsop-keystate}} that solves
 a similar problem for delegation synchronization between child and
 parent, which has already been implemented and shown to work.
 
-## MSA Communication via REST API
+## Agent Communication via REST API (johani: omskriven 20250228)
 
 REST APIs are well-known and a natural fit for many distributed
 systems. The challenge is mostly in the initial setup of secure
 communication. The certificates need to be validated, preferably
 without a requirement on trusting a third party CA. The API endpoints
-for each MSA need to be located. Once secure communication has been
-established, using a REST API for MSA communication is
+for each Agent need to be located. Once secure communication has been
+established, using a REST API for Agent communication is
 straight-forward.
 
-## Locating Remote Multi-Signer Agents
+## Locating Remote Agents (johani: omskriven 20250228)
 
-When an MSA receives a zone via zone transfer from the signer it will
+When an Agent receives a zone via zone transfer from the Signer it will
 analyze the zone to see whether it contains an HSYNC RRset. If there
-is no HSYNC RRset the zone MUST be ignored by the MSA from the
-point-of-view of multi-signer synchronization.
+is no HSYNC RRset the zone MUST be ignored by the Agent from the
+point-of-view of provider synchronization.
 
-If, however, the zone does contain an HSYNC RRset then the MSA must
-analyze this RRset to identify the other MSAs for the zone via their
-target names in each HSYNC record. If any of the other MSAs listed in
-the HSYNC RRset is previously unknown to this MSA then secure
-communication with this other MSA MUST be established.
+If, however, the zone does contain an HSYNC RRset then the Agent must
+analyze this RRset to identify the other Agents for the zone via their
+target names in each HSYNC record. If any of the other Agents listed in
+the HSYNC RRset is previously unknown to this Agent then secure
+communication with this other Agent MUST be established.
 
 Secure communication can be achieved via various transports and it is
-up to the MSAs in the zone's HSYNC records to determine amongst
+up to the Agents in the zone's HSYNC records to determine amongst
 themselves. This document proposes two transports: "DNS" and
-"API". "DNS" is designated as as a baseline that MSAs MUST support to
+"API". "DNS" is designated as as a baseline that Agents MUST support to
 be compliant.
 
-The following two subsections describe the mechanism by which an MSA
-SHOULD locate a remote MSA and establish secure DNS-based and
+The following two subsections describe the mechanism by which an Agent
+SHOULD locate a remote Agent and establish secure DNS-based and
 API-based communications, respectively.
 
-### Locating a Remote DNS-Method Multi-Signer Agent
+### Locating a Remote DNS-Method Agent (johani: omskriven 20250228)
 
-Locating a remote MSA using the DNS mechanism consists of the
+Locating a remote Agent using the DNS mechanism consists of the
 following steps:
 
  * Lookup and DNSSEC-validate a URI record for the DNS protocol for
@@ -607,11 +629,11 @@ following steps:
 
 Example: given the following HSYNC record for a remote MSA:
 
-zone.example.     IN HSYNC  ON  AGENT  YES  msa.provider.com.
+zone.example.     IN HSYNC  ON  AGENT  YES  agent.provider.com. agent.zone.example.
 
 The local MSA will look up the URI record for msa.provider.com:
 
-_dns._tcp.msa.provider.com.  IN  URI  10 10 “dns://ns.msa.provider.com:5399/”
+_dns._tcp.msa.provider.com.  IN  URI  10 10 "dns://ns.msa.provider.com:5399/"
 _dns._tcp.msa.provider.com.  IN  RRSIG URI …
 
 which triggers a lookup for ns.msa.provider.com. SVCB to get the IPv4
@@ -954,10 +976,10 @@ At this stage it is not clear that one model is superior to the other.
 In a leader/follower deployment, a designated multi-signer agent
 assumes the role of a leader, directing other agents, or followers,
 through the multi-signer process state transitions. In this mode it is
-necessary to conduct “elections” where one of the MSAs is chosen as
+necessary to conduct "elections" where one of the MSAs is chosen as
 the Leader before initiating a new multi-signer process. Once the
 Leader has been chosen, this model is mostly equivalent to the
-original multi-signer “model 2”, with a single controller. The other
+original multi-signer "model 2", with a single controller. The other
 MSAs (the followers) essentially become proxies between the controller
 (the Leader) and the DNS Provider each MSA represents.
 
@@ -967,7 +989,7 @@ In peer mode, the MSAs still need to locate each other, but instead of
 relying on trust in each other, each multi-signer agent operates
 independently as a peer. I.e. each MSA executes each step in the
 multi-signer process on its own. The communication is essentially
-reduced to a notification mechanism (“I am now in state N”), although
+reduced to a notification mechanism ("I am now in state N"), although
 authenticated to avoid having the contents of this communication
 become an attack vector for an adversary.
 
